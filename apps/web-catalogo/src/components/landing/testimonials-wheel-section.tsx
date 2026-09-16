@@ -71,21 +71,21 @@ export function TestimonialsWheelSection() {
   return (
     <section
       id="testimonios"
-      className="relative w-full bg-[#050505] text-white py-24 sm:py-32 px-6 sm:px-8 border-t border-white/5 overflow-hidden"
+      className="relative w-full bg-transparent text-[#171B20] py-24 sm:py-32 px-6 sm:px-8 border-t border-[#C9CDD2]/30 overflow-hidden"
     >
       <div className="max-w-6xl mx-auto space-y-12">
         {/* Section Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-white shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-widest text-zinc-300">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#171B20]/5 border border-[#C9CDD2]/40 text-[#171B20] shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-[#8B95A0]" />
+            <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-widest text-[#8B95A0]">
               Experiencias de Clientes
             </span>
           </div>
-          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-[#171B20]">
             Opiniones de Nuestra Comunidad
           </h2>
-          <p className="text-sm text-zinc-400 max-w-md mx-auto">
+          <p className="text-sm text-[#8B95A0] max-w-md mx-auto">
             Gira la rueda o arrastra para explorar lo que opinan quienes visten nuestras prendas.
           </p>
         </div>
@@ -93,16 +93,16 @@ export function TestimonialsWheelSection() {
         {/* 2-Column Grid: Infinite Wheel on the left, Detailed Card on the right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-4">
           {/* Wheel Selector (5 cols) */}
-          <div className="lg:col-span-5 relative rounded-3xl bg-zinc-950/60 border border-white/10 p-2 sm:p-4 backdrop-blur-xl shadow-2xl">
-            <div className="px-4 pt-2 text-[10px] font-mono uppercase tracking-widest text-zinc-500 flex items-center justify-between">
+          <div className="lg:col-span-5 relative rounded-3xl bg-[#F4F2EE]/60 border border-[#C9CDD2]/40 p-2 sm:p-4 backdrop-blur-xl shadow-2xl">
+            <div className="px-4 pt-2 text-[10px] font-mono uppercase tracking-widest text-[#8B95A0] flex items-center justify-between">
               <span>Selecciona un cliente</span>
               <span>↕ Arrastra</span>
             </div>
             <InfiniteTextWheel
               items={authorNames}
               onSelectIndex={setSelectedIndex}
-              arrowColor="#5b58eb"
-              color="#71717a"
+              arrowColor="#2B3138"
+              color="#8B95A0"
             />
           </div>
 
@@ -115,10 +115,10 @@ export function TestimonialsWheelSection() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -15, scale: 0.98 }}
                 transition={{ duration: 0.25, ease: "easeOut" }}
-                className="p-8 sm:p-10 rounded-3xl bg-zinc-900/40 border border-white/10 backdrop-blur-2xl shadow-2xl space-y-6 relative overflow-hidden"
+                className="p-8 sm:p-10 rounded-3xl bg-[#FBFAF6]/70 border border-[#C9CDD2]/40 backdrop-blur-2xl shadow-2xl space-y-6 relative overflow-hidden"
               >
                 {/* Background quote icon watermark */}
-                <MessageSquareQuote className="absolute -bottom-6 -right-6 w-36 h-36 text-white/[0.03] pointer-events-none" />
+                <MessageSquareQuote className="absolute -bottom-6 -right-6 w-36 h-36 text-[#171B20]/[0.04] pointer-events-none" />
 
                 {/* Rating & Garment */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -128,24 +128,24 @@ export function TestimonialsWheelSection() {
                     ))}
                   </div>
 
-                  <span className="text-[11px] font-mono font-medium px-3 py-1 rounded-full bg-white/10 border border-white/10 text-zinc-300">
+                  <span className="text-[11px] font-mono font-medium px-3 py-1 rounded-full bg-[#171B20]/8 border border-[#C9CDD2]/30 text-[#8B95A0]">
                     {currentTestimonial.item}
                   </span>
                 </div>
 
                 {/* Main Quote */}
-                <p className="text-lg sm:text-2xl text-zinc-100 font-medium leading-relaxed italic">
+                <p className="text-lg sm:text-2xl text-[#2B3138] font-medium leading-relaxed italic">
                   "{currentTestimonial.quote}"
                 </p>
 
                 {/* Author Info */}
-                <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between pt-4 border-t border-[#C9CDD2]/30">
                   <div>
-                    <h4 className="text-base font-bold text-white flex items-center gap-2">
+                    <h4 className="text-base font-bold text-[#171B20] flex items-center gap-2">
                       <span>{currentTestimonial.author}</span>
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     </h4>
-                    <p className="text-xs text-zinc-400 mt-0.5">
+                    <p className="text-xs text-[#8B95A0] mt-0.5">
                       {currentTestimonial.city}
                     </p>
                   </div>

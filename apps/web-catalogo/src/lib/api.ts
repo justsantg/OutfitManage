@@ -37,18 +37,23 @@ export async function fetchCatalogo(params?: {
   if (params?.color) query.append('color', params.color);
   if (params?.q) query.append('q', params.q);
   if (params?.page) query.append('page', params.page.toString());
-  if (params?.limit) query.append('limit', params.limit.toString());
+  const safeLimit = Math.min(params?.limit ?? 48, 48);
+  query.append('limit', safeLimit.toString());
 
   const queryString = query.toString() ? `?${query.toString()}` : '';
   const url = getPublicApiUrl(`/catalogo${queryString}`);
   
   try {
-    const res = await fetch(url, {
-      next: { revalidate: 30 }, // ISR cada 30 segundos
+    const fetchOptions: RequestInit = {
       headers: {
         'Accept': 'application/json',
       },
-    });
+    };
+    if (typeof window === 'undefined') {
+      (fetchOptions as any).next = { revalidate: 30 };
+    }
+
+    const res = await fetch(url, fetchOptions);
 
     if (!res.ok) {
       const errorBody = await res.json().catch(() => null);

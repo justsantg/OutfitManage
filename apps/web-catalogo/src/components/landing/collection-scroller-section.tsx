@@ -38,11 +38,11 @@ const LOOKBOOK_ITEMS: ImageScrollerItem[] = [
 
 export function CollectionScrollerSection() {
   return (
-    <section id="scroller-editorial" className="relative w-full bg-[#050505] text-white">
+    <section id="scroller-editorial" className="relative w-full bg-transparent text-[#171B20]">
       <ImageScroller
         items={LOOKBOOK_ITEMS}
         transitionType="fade"
-        backgroundColor="#050505"
+        backgroundColor="#BAC9D6"
         dockPosition="bottom"
       />
     </section>

@@ -56,8 +56,8 @@ const DEFAULT_ITEMS: ImageScrollerItem[] = [
 export function ImageScroller({
   items = DEFAULT_ITEMS,
   transitionType = "fade",
-  backgroundColor = "#050505",
-  textColor = "#FFFFFF",
+  backgroundColor = "#BAC9D6",
+  textColor = "#171B20",
   dockPosition = "bottom",
   className = "",
 }: ImageScrollerProps) {
@@ -110,7 +110,7 @@ export function ImageScroller({
   }, [scrollYProgress, validItems.length]);
 
   const scrollHeight = useMemo(() => {
-    return Math.max(validItems.length * 100, 100);
+    return Math.max(validItems.length * 45, 170);
   }, [validItems.length]);
 
   const getTransitionVariants = (index: number) => {
@@ -244,7 +244,7 @@ export function ImageScroller({
                 draggable={false}
               />
               {/* Vignette Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/60" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#BAC9D6]/80 via-transparent to-[#BAC9D6]/50" />
             </motion.div>
           );
         })}
@@ -263,7 +263,7 @@ export function ImageScroller({
                 transition={{ duration: 0.6, ease: "easeInOut", delay: 0.1 }}
               >
                 {item.tag && (
-                  <span className="mb-3 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest">
+                  <span className="mb-3 px-3.5 py-1 rounded-full bg-[#171B20]/8 backdrop-blur-md border border-[#C9CDD2]/30 text-[#171B20] text-[10px] sm:text-xs font-mono font-bold uppercase tracking-widest">
                     {item.tag}
                   </span>
                 )}
@@ -274,7 +274,7 @@ export function ImageScroller({
                   {item.text}
                 </h3>
                 {item.subtitle && (
-                  <p className="mt-3 text-sm sm:text-base md:text-lg text-zinc-300 font-medium max-w-xl drop-shadow-md">
+                  <p className="mt-3 text-sm sm:text-base md:text-lg text-[#8B95A0] font-medium max-w-xl drop-shadow-md">
                     {item.subtitle}
                   </p>
                 )}
@@ -299,13 +299,13 @@ export function ImageScroller({
           {/* Drag handle */}
           <div
             aria-label="Drag handle"
-            className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-9 h-3 rounded-full bg-zinc-700/80 border border-white/10 backdrop-blur-md flex items-center justify-center cursor-grab active:cursor-grabbing shadow-md"
+            className="absolute -top-3.5 left-1/2 -translate-x-1/2 w-9 h-3 rounded-full bg-[#C9CDD2]/80 border border-[#C9CDD2]/40 backdrop-blur-md flex items-center justify-center cursor-grab active:cursor-grabbing shadow-md"
           >
-            <div className="w-4 h-1 rounded-full bg-zinc-400" />
+            <div className="w-4 h-1 rounded-full bg-[#8B95A0]" />
           </div>
 
           {/* Dock Pill Body */}
-          <div className="relative rounded-2xl bg-black/65 backdrop-blur-2xl border border-white/15 p-2 shadow-2xl flex items-center gap-2">
+          <div className="relative rounded-2xl bg-[#F4F2EE]/80 backdrop-blur-2xl border border-[#C9CDD2]/40 p-2 shadow-2xl flex items-center gap-2">
             {validItems.map((item, index) => {
               const src = getImageSrc(item.image);
               const isActive = activeIndex === index;
@@ -323,7 +323,7 @@ export function ImageScroller({
                   {isActive && (
                     <motion.div
                       layoutId="thumb-active-border"
-                      className="absolute inset-0 rounded-xl border-2 border-white z-10 pointer-events-none shadow-lg"
+                      className="absolute inset-0 rounded-xl border-2 border-[#171B20] z-10 pointer-events-none shadow-lg"
                       transition={{ type: "spring", stiffness: 450, damping: 30 }}
                     />
                   )}
