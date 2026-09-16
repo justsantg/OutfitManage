@@ -21,7 +21,7 @@ cd ../..
 pnpm dev
 ```
 
-- 🛍️ **Frontend Catálogo & Panel Admin:** [http://localhost:3001](http://localhost:3001)
+- 🛍️ **Frontend Catálogo & Panel Admin:** [http://localhost:4200](http://localhost:4200)
 - 🔌 **Backend API REST:** [http://localhost:3000](http://localhost:3000)
 - 📑 **Swagger UI Docs:** [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
 

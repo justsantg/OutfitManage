@@ -14,6 +14,97 @@ const ALLOWED_MIME_TO_EXT: Record<string, string> = {
   'video/quicktime': 'mov',
 };
 
+/**
+ * Detecta el tipo MIME real a partir de los magic numbers (firmas de bytes) del buffer.
+ * Nunca confía en la cabecera `mimetype` enviada por el cliente ni en su extensión original (SEC-07).
+ */
+export function detectMimeTypeFromBuffer(buffer: Buffer): string | null {
+  if (!buffer || buffer.length < 4) {
+    return null;
+  }
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+
+  // GIF: GIF87a o GIF89a
+  if (
+    buffer.length >= 6 &&
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x38 &&
+    (buffer[4] === 0x37 || buffer[4] === 0x39) &&
+    buffer[5] === 0x61
+  ) {
+    return 'image/gif';
+  }
+
+  // WEBP: 'RIFF'....'WEBP'
+  if (
+    buffer.length >= 12 &&
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+
+  // WebM / Matroska: 1A 45 DF A3
+  if (
+    buffer.length >= 4 &&
+    buffer[0] === 0x1a &&
+    buffer[1] === 0x45 &&
+    buffer[2] === 0xdf &&
+    buffer[3] === 0xa3
+  ) {
+    return 'video/webm';
+  }
+
+  // MP4 / QuickTime (ISOBMFF): bytes 4-7 son 'ftyp'
+  if (buffer.length >= 12) {
+    const ftyp = buffer.toString('latin1', 4, 8);
+    if (ftyp === 'ftyp') {
+      const brand = buffer.toString('latin1', 8, 12);
+      if (brand.startsWith('qt')) {
+        return 'video/quicktime';
+      }
+      return 'video/mp4';
+    }
+  }
+
+  // QuickTime alternativo (moov, mdat, free, wide)
+  if (buffer.length >= 8) {
+    const box = buffer.toString('latin1', 4, 8);
+    if (['moov', 'mdat', 'free', 'wide'].includes(box)) {
+      return 'video/quicktime';
+    }
+  }
+
+  return null;
+}
+
 export interface UploadedMulterFile {
   fieldname?: string;
   originalname: string;
@@ -89,14 +180,16 @@ export class StorageService {
     file: UploadedMulterFile,
     customFolder?: string,
   ): Promise<UploadResult> {
-    const ext = ALLOWED_MIME_TO_EXT[file.mimetype];
-    if (!ext) {
+    // Validar tipo MIME real inspeccionando los magic numbers del buffer (SEC-07)
+    const mimeReal = detectMimeTypeFromBuffer(file.buffer);
+    if (!mimeReal || !ALLOWED_MIME_TO_EXT[mimeReal]) {
       throw new BadRequestException(
-        `Tipo de archivo no permitido: ${file.mimetype}. Formatos aceptados: ${Object.keys(ALLOWED_MIME_TO_EXT).join(', ')}`,
+        `Tipo de archivo no permitido o contenido inválido. Formatos aceptados: ${Object.keys(ALLOWED_MIME_TO_EXT).join(', ')}`,
       );
     }
 
-    const isVideo = file.mimetype.startsWith('video/');
+    const ext = ALLOWED_MIME_TO_EXT[mimeReal];
+    const isVideo = mimeReal.startsWith('video/');
     const bucket = isVideo ? this.videosBucket : this.imagesBucket;
     const tipo = isVideo ? 'VIDEO' : 'IMAGE';
 
@@ -104,12 +197,12 @@ export class StorageService {
     const folder = this.sanitizeFolder(customFolder);
     const filePath = `${folder}/${cleanFileName}`;
 
-    this.logger.log(`Subiendo archivo a bucket ${bucket} en ruta ${filePath}`);
+    this.logger.log(`Subiendo archivo a bucket ${bucket} en ruta ${filePath} (MIME real: ${mimeReal})`);
 
     const { data, error } = await this.supabase.storage
       .from(bucket)
       .upload(filePath, file.buffer, {
-        contentType: file.mimetype,
+        contentType: mimeReal,
         upsert: false,
       });
 

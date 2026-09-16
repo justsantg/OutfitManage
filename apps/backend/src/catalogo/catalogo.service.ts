@@ -284,7 +284,6 @@ export class CatalogoService {
               : stockTotal <= 3
                 ? 'LOW_STOCK'
                 : 'IN_STOCK',
-          stockRestante: stockTotal <= 3 && stockTotal > 0 ? stockTotal : null,
         };
       }),
     );

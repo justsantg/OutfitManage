@@ -33,7 +33,7 @@ OutfitManage/
 ### Puertos por defecto en Local:
 - **Backend API (NestJS):** `http://localhost:3000`
 - **Documentación Swagger / OpenAPI:** `http://localhost:3000/api/docs`
-- **Frontend Catálogo + Panel Administrativo (Next.js):** `http://localhost:3001`
+- **Frontend Catálogo + Panel Administrativo (Next.js):** `http://localhost:4200`
 - **Proxy Interno:** La web redirige `/backend-public/*` y `/backend-api/*` directamente a NestJS sin fricción de CORS ni bloqueos de firewall.
 
 ---
@@ -74,7 +74,7 @@ JWT_SECRET="clave_secreta_super_segura_para_firmar_tokens_jwt_2026"
 JWT_EXPIRES_IN="7d"
 
 # 3. CORS (Orígenes permitidos separados por coma)
-CORS_ORIGIN="http://localhost:3001,http://localhost:3002"
+CORS_ORIGIN="http://localhost:4200,http://localhost:3001"
 
 # 4. Almacenamiento de Imágenes (Supabase Storage - Opcional para desarrollo local)
 SUPABASE_URL="https://tu-proyecto.supabase.co"
@@ -89,7 +89,7 @@ Crea un archivo `.env.local` dentro de la carpeta `apps/web-catalogo/`:
 # ===================================================
 # CONFIGURACIÓN DEL FRONTEND (Next.js)
 # ===================================================
-PORT=3001
+PORT=4200
 
 # En desarrollo local dejar vacío para usar el proxy automático de Next.js
 # En producción, colocar la URL pública del backend desplegado
@@ -140,7 +140,7 @@ pnpm dev
 
 Este comando utilizará **Turborepo** para iniciar simultáneamente:
 - `backend:dev` en `http://localhost:3000` (escuchando en `0.0.0.0:3000`)
-- `web-catalogo:dev` en `http://localhost:3001` (escuchando en `0.0.0.0:3001`)
+- `web-catalogo:dev` en `http://localhost:4200` (escuchando en `0.0.0.0:4200`)
 
 ---
 
@@ -154,9 +154,9 @@ El sistema cuenta con soporte de **Progressive Web App (PWA)** instalable como a
    - **En Mac/Linux:** Ejecuta `ifconfig` o `ip a`.
 2. En el navegador de tu teléfono (Chrome o Safari), abre:
    ```text
-   http://[TU_IP_LOCAL]:3001
+   http://[TU_IP_LOCAL]:4200
    ```
-   *(Ejemplo: `http://192.168.1.15:3001`)*.
+   *(Ejemplo: `http://192.168.1.15:4200`)*.
 
 ### ¿Cómo instalar la PWA en el celular?
 - **En Android (Google Chrome):**

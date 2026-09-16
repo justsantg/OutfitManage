@@ -53,7 +53,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "img-src 'self' data: https://*.supabase.co",
+              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://res.cloudinary.com https://via.placeholder.com",
               "media-src 'self' https://*.supabase.co",
               "connect-src 'self'",
               "script-src 'self' 'unsafe-inline'",

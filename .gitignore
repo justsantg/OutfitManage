@@ -26,6 +26,8 @@ build/
 .env.production.local
 **/.env
 **/.env.local
+apps/backend/scripts/dev/
+**/scripts/dev/
 
 # Logs
 logs/

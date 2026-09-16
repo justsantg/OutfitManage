@@ -28,14 +28,21 @@ jest.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
+const JPEG_BUFFER = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+]);
+const PNG_BUFFER = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00,
+]);
+
 function makeFile(
-  overrides: Partial<{ mimetype: string; originalname: string }> = {},
+  overrides: Partial<{ mimetype: string; originalname: string; buffer: Buffer }> = {},
 ) {
   return {
     originalname: overrides.originalname ?? 'foto.jpg',
     mimetype: overrides.mimetype ?? 'image/jpeg',
     size: 1024,
-    buffer: Buffer.from('contenido'),
+    buffer: overrides.buffer ?? JPEG_BUFFER,
   };
 }
 
@@ -65,17 +72,39 @@ describe('StorageService', () => {
     service = module.get<StorageService>(StorageService);
   });
 
-  describe('uploadFile — allowlist de tipo MIME', () => {
-    it('rechaza un mimetype fuera de la allowlist', async () => {
+  describe('uploadFile — validación de tipo MIME por magic numbers (SEC-07)', () => {
+    it('rechaza un archivo con buffer no reconocido o fuera de la allowlist', async () => {
       await expect(
-        service.uploadFile(makeFile({ mimetype: 'application/x-msdownload' })),
+        service.uploadFile(
+          makeFile({
+            mimetype: 'application/x-msdownload',
+            buffer: Buffer.from('MZ\x90\x00\x03\x00\x00\x00'),
+          }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(uploadMock).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un archivo malicioso renombrado aunque el cliente declare image/jpeg (anti-spoofing)', async () => {
+      await expect(
+        service.uploadFile(
+          makeFile({
+            originalname: 'script_malicioso.jpg',
+            mimetype: 'image/jpeg',
+            buffer: Buffer.from('<?php echo "evil"; ?>'),
+          }),
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(uploadMock).not.toHaveBeenCalled();
     });
 
     it('ignora la extensión del nombre de archivo del cliente y usa la derivada del MIME real', async () => {
       await service.uploadFile(
-        makeFile({ originalname: 'foto.jpg.exe', mimetype: 'image/png' }),
+        makeFile({
+          originalname: 'foto.jpg.exe',
+          mimetype: 'image/png',
+          buffer: PNG_BUFFER,
+        }),
       );
 
       const [path] = uploadMock.mock.calls[0];
