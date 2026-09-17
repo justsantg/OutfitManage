@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsInt,
+  IsBoolean,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -57,4 +58,24 @@ export class CreateMovimientoDto {
   @IsOptional()
   @IsString()
   motivo?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Solo para AJUSTE: true si el conteo físico encontró SOBRANTE (incrementa el saldo). ' +
+      'Por defecto false = FALTANTE (decrementa). Ignorado para otros tipos.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  ajusteIncrementa?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'ID del movimiento que este movimiento corrige (RF-003). El ledger es inmutable: una ' +
+      'corrección es un movimiento nuevo que referencia al original, nunca una edición.',
+    example: 'uuid',
+  })
+  @IsOptional()
+  @IsString()
+  movimientoReferenciaId?: string;
 }

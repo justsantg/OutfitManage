@@ -6,6 +6,7 @@ import { Rol } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RefreshTokenService } from './refresh-token.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -39,6 +40,14 @@ describe('AuthService', () => {
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue('15m') },
+        },
+        {
+          provide: RefreshTokenService,
+          useValue: {
+            emitir: jest.fn().mockResolvedValue('refresh-token-emitido'),
+            rotar: jest.fn(),
+            revocarPorToken: jest.fn(),
+          },
         },
       ],
     }).compile();

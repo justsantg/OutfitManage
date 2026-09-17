@@ -1,0 +1,86 @@
+name: CI
+
+# Gates bloqueantes del pipeline (SRS §9 DoD): build + tests, auditoría de dependencias,
+# escaneo de secretos, SAST y OSV. Todo corre en el runner de CI, nunca en la máquina del
+# desarrollador: el runner no tiene el .env de la instalación ni la service_role key de
+# Supabase, así que ninguna de estas herramientas ve credenciales reales del proyecto.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build, typecheck, lint y tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # lee packageManager de package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # api-client se construye primero: el backend lo importa (workspace:*).
+      - run: pnpm --filter @core/api-client build
+      - run: pnpm -r --if-present typecheck
+      # Lint del backend como gate (limpio). Las apps Next aún no tienen ESLint configurado
+      # (next lint es interactivo y está deprecado en Next 15) — pendiente en todo.md.
+      - run: pnpm --filter backend lint
+      - run: pnpm -r --if-present build
+      # Cobertura: el DoD exige ≥70% en lógica de inventario y ≥50% en el resto.
+      - run: pnpm --filter backend test:cov
+
+  dependency-audit:
+    name: Auditoría de dependencias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Bloquea ante advisories alto/crítico sin excepción documentada (DoD del SRS).
+      - run: pnpm audit --audit-level high
+
+  osv-scanner:
+    name: OSV Scanner (lockfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.2.3
+        with:
+          scan-args: |-
+            --lockfile=./pnpm-lock.yaml
+
+  secret-scan:
+    name: Escaneo de secretos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks recorre el historial completo
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      # Solo packs oficiales del registro. No se agregan reglas propias hasta validarlas contra
+      # un archivo deliberadamente vulnerable (ver herramientas.md): una regla anclada al patrón
+      # equivocado reporta "0 hallazgos" y parece que el código está limpio cuando no lo está.
+      - run: semgrep scan --error --config p/typescript --config p/nodejs --config p/owasp-top-ten

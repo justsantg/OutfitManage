@@ -20,6 +20,8 @@ import {
 import { InventarioService } from './inventario.service';
 import { CreateMovimientoDto } from './dto/create-movimiento.dto';
 import { QueryStockDto } from './dto/query-stock.dto';
+import { SyncBatchDto } from './dto/sync-batch.dto';
+import { CambioTallaDto } from './dto/cambio-talla.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RbacGuard } from '../common/guards/rbac.guard';
 import { MovimientoRbacGuard } from '../common/guards/movimiento-rbac.guard';
@@ -108,6 +110,45 @@ export class InventarioController {
       req.user.id,
       idempotencyKey,
     );
+  }
+
+  @Post('sync/batch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sincronizar un lote de operaciones offline (app móvil)',
+    description:
+      'Procesa operaciones encoladas sin conexión, cada una con su propia Idempotency-Key ' +
+      '(RF-007 / ADR-004). Responde por operación con status processed/duplicate/error; nunca ' +
+      'es todo-o-nada. El permiso por tipo de movimiento se valida por operación (matriz RF-006). ' +
+      'Reenviar el mismo lote produce el mismo estado final.',
+  })
+  syncBatch(@Body() dto: SyncBatchDto, @Req() req: AuthenticatedRequest) {
+    return this.inventarioService.procesarBatch(dto.operaciones, {
+      id: req.user.id,
+      rol: req.user.rol,
+    });
+  }
+
+  @Post('cambio-talla')
+  @Roles('ADMIN', 'VENDEDOR')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Registrar un cambio de talla (RF-008)',
+    description:
+      'Crea dos movimientos ligados y atómicos: DEVOLUCION de la prenda devuelta + SALIDA de la ' +
+      'nueva. Permitido a ADMIN y VENDEDOR. Requiere Idempotency-Key.',
+  })
+  @ApiHeader({
+    name: 'idempotency-key',
+    description: 'UUID v4 único por operación (obligatorio)',
+    required: true,
+  })
+  cambioTalla(
+    @Body() dto: CambioTallaDto,
+    @Headers('idempotency-key') idempotencyKey: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.inventarioService.cambioTalla(dto, req.user.id, idempotencyKey);
   }
 
   @Get('stock')

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "pnpm --filter @core/api-client build && pnpm -r --parallel dev",
+    "dev:turbo": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test"
   },

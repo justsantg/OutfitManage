@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Rol } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -20,6 +21,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private refreshTokenService: RefreshTokenService,
   ) {}
 
   /**
@@ -70,6 +72,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
+    const refreshToken = await this.refreshTokenService.emitir(newUser.id);
 
     return {
       user: {
@@ -79,6 +82,7 @@ export class AuthService {
         rol: newUser.rol,
       },
       accessToken,
+      refreshToken,
       tokenType: 'Bearer',
       expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION', '15m'),
     };
@@ -115,6 +119,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
+    const refreshToken = await this.refreshTokenService.emitir(user.id);
 
     return {
       user: {
@@ -124,9 +129,60 @@ export class AuthService {
         rol: user.rol,
       },
       accessToken,
+      refreshToken,
       tokenType: 'Bearer',
       expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION', '15m'),
     };
+  }
+
+  /**
+   * Renueva el access token a partir de un refresh token válido, rotándolo (SRS Sección 5).
+   * El access token nuevo se firma con el rol actual del usuario en base de datos, no con el
+   * que traía el token anterior: si un ADMIN fue degradado, la renovación refleja el cambio.
+   */
+  async refresh(refreshToken: string, ip?: string) {
+    const { usuarioId, token } =
+      await this.refreshTokenService.rotar(refreshToken);
+
+    const user = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+    });
+
+    if (!user || !user.activo) {
+      this.logSecurityEvent('warn', 'auth.refresh.inactive_user', { ip });
+      throw new UnauthorizedException('Usuario inactivo o inexistente');
+    }
+
+    this.logSecurityEvent('log', 'auth.refresh.success', {
+      ip,
+      userId: user.id,
+    });
+
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      rol: user.rol,
+    });
+
+    return {
+      user: {
+        id: user.id,
+        nombre: user.nombre,
+        email: user.email,
+        rol: user.rol,
+      },
+      accessToken,
+      refreshToken: token,
+      tokenType: 'Bearer',
+      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION', '15m'),
+    };
+  }
+
+  /** Cierre de sesión: revoca la familia completa del refresh token presentado. */
+  async logout(refreshToken: string, userId?: string, ip?: string) {
+    await this.refreshTokenService.revocarPorToken(refreshToken);
+    this.logSecurityEvent('log', 'auth.logout', { ip, userId });
+    return { message: 'Sesión cerrada' };
   }
 
   /**

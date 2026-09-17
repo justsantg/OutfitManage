@@ -60,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     localStorage.setItem('tienda360_token', data.accessToken);
     localStorage.setItem('tienda360_user', JSON.stringify(data.user));
+    if (data.refreshToken) localStorage.setItem('tienda360_refresh', data.refreshToken);
 
     router.push('/');
   };
@@ -82,15 +83,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     localStorage.setItem('tienda360_token', authData.accessToken);
     localStorage.setItem('tienda360_user', JSON.stringify(authData.user));
+    if (authData.refreshToken) localStorage.setItem('tienda360_refresh', authData.refreshToken);
 
     router.push('/');
   };
 
   const logout = () => {
+    // Revoca la familia de refresh tokens en el servidor (best-effort: si falla la red, la
+    // sesión local igual se cierra y el access token expira solo).
+    const refreshToken = localStorage.getItem('tienda360_refresh');
+    if (refreshToken && token) {
+      void fetch(`${API_BASE_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => {});
+    }
     setToken(null);
     setUser(null);
     localStorage.removeItem('tienda360_token');
     localStorage.removeItem('tienda360_user');
+    localStorage.removeItem('tienda360_refresh');
     router.push('/login');
   };
 

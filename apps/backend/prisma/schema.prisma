@@ -44,8 +44,32 @@ model Usuario {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   movimientos   MovimientoInventario[]
+  refreshTokens RefreshToken[]
 
   @@map("usuario")
+}
+
+/// Refresh tokens con rotación (SRS Sección 5: "refresh token con rotación"). Se guarda solo
+/// el hash SHA-256 del token, nunca el valor en claro: si la base se filtra, los refresh tokens
+/// almacenados no son utilizables. Cada rotación revoca el anterior y encadena `reemplazadoPorId`,
+/// lo que permite detectar reuso de un token ya rotado (señal de robo de credencial).
+model RefreshToken {
+  id               String        @id @default(uuid()) @db.Uuid
+  usuarioId        String        @map("usuario_id") @db.Uuid
+  tokenHash        String        @unique @map("token_hash")
+  familiaId        String        @map("familia_id") @db.Uuid
+  expiraEn         DateTime      @map("expira_en")
+  revocadoEn       DateTime?     @map("revocado_en")
+  reemplazadoPorId String?       @unique @map("reemplazado_por_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  usuario          Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  reemplazadoPor   RefreshToken? @relation("RotacionRefreshToken", fields: [reemplazadoPorId], references: [id])
+  reemplazaA       RefreshToken? @relation("RotacionRefreshToken")
+
+  @@index([usuarioId])
+  @@index([familiaId])
+  @@map("refresh_token")
 }
 
 model Ubicacion {

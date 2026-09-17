@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth-context';
 import { useToast } from '../../lib/toast-context';
-import { Sparkles, Lock, Mail, Loader2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
+
+const CATALOGO_URL = process.env.NEXT_PUBLIC_CATALOGO_URL || 'http://localhost:3001';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -29,11 +31,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillCredentials = (userEmail: string, userPass: string) => {
-    setEmail(userEmail);
-    setPassword(userPass);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#090d16] relative overflow-hidden">
       {/* Glow ambient background */}
@@ -44,7 +41,7 @@ export default function LoginPage() {
         {/* Acceso a Tienda Virtual */}
         <div className="flex justify-center">
           <a
-            href="http://localhost:3001"
+            href={CATALOGO_URL}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-slate-900/80 text-sky-400 border border-slate-800 hover:border-sky-500/40 hover:bg-slate-800 transition-all shadow-lg"
           >
             <span>🛍️ Ir a la Tienda Virtual (Catálogo Público)</span>
@@ -128,36 +125,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Cuentas de Acceso Rápido */}
-          <div className="pt-4 border-t border-slate-800/80 space-y-2">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block text-center">
-              Acceso Rápido de Prueba
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => fillCredentials('admin@tienda360.com', 'admin123')}
-                className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-all text-center truncate"
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => fillCredentials('vendedor@tienda360.com', 'vendedor123')}
-                className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition-all text-center truncate"
-              >
-                Vendedor
-              </button>
-              <button
-                type="button"
-                onClick={() => fillCredentials('bodega@tienda360.com', 'bodega123')}
-                className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition-all text-center truncate"
-              >
-                Bodega
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Link a Registro */}

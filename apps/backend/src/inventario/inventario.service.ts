@@ -4,6 +4,7 @@ import {
   ConflictException,
   NotFoundException,
   UnprocessableEntityException,
+  HttpException,
 } from '@nestjs/common';
 import { MovimientoTipo, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,15 +13,36 @@ import {
   MovimientoTipoDto,
 } from './dto/create-movimiento.dto';
 import { QueryStockDto } from './dto/query-stock.dto';
+import { CambioTallaDto } from './dto/cambio-talla.dto';
+import { puedeRegistrarMovimiento } from '../common/rbac/movimiento-permisos';
 
-// Tipos de movimiento que restan del saldo de la ubicación de origen (ADR-003).
-// AJUSTE se trata como corrección a la baja (faltante detectado en conteo físico),
-// que es el único caso de ajuste que admite el DTO actual (cantidad siempre positiva, sin signo).
-const TIPOS_QUE_DECREMENTAN: MovimientoTipoDto[] = [
+export interface BatchOperacion {
+  idempotencyKey: string;
+  payload: CreateMovimientoDto;
+}
+export interface BatchResultado {
+  idempotencyKey: string;
+  status: 'processed' | 'duplicate' | 'error';
+  detalle?: string;
+}
+
+// SALIDA y TRASLADO siempre restan del saldo de origen (ADR-003). AJUSTE puede ir en cualquier
+// dirección según el conteo físico: por defecto resta (faltante), o suma si `ajusteIncrementa`
+// es true (sobrante). ENTRADA y DEVOLUCION siempre suman.
+const TIPOS_QUE_DECREMENTAN_SIEMPRE: MovimientoTipoDto[] = [
   MovimientoTipoDto.SALIDA,
-  MovimientoTipoDto.AJUSTE,
   MovimientoTipoDto.TRASLADO,
 ];
+
+function decrementaOrigen(dto: {
+  tipo: MovimientoTipoDto;
+  ajusteIncrementa?: boolean;
+}): boolean {
+  if (dto.tipo === MovimientoTipoDto.AJUSTE) {
+    return !dto.ajusteIncrementa;
+  }
+  return TIPOS_QUE_DECREMENTAN_SIEMPRE.includes(dto.tipo);
+}
 
 const MAX_LIMIT = 100;
 
@@ -41,6 +63,24 @@ export class InventarioService {
     usuarioId: string,
     idempotencyKey: string,
   ) {
+    const { id } = await this.registrarMovimiento(
+      dto,
+      usuarioId,
+      idempotencyKey,
+    );
+    return this.buildMovimientoResponse(id);
+  }
+
+  /**
+   * Núcleo de registro: valida, deduplica por Idempotency-Key y persiste en el ledger dentro de
+   * una transacción. Devuelve si el movimiento se creó ('processed') o si la key ya existía con
+   * el mismo payload ('duplicate'). Lo usan tanto el endpoint sincrónico como el batch de sync.
+   */
+  async registrarMovimiento(
+    dto: CreateMovimientoDto,
+    usuarioId: string,
+    idempotencyKey: string,
+  ): Promise<{ status: 'processed' | 'duplicate'; id: string }> {
     if (!idempotencyKey || !idempotencyKey.trim()) {
       throw new BadRequestException(
         'El header idempotency-key es obligatorio para registrar movimientos de inventario',
@@ -82,7 +122,7 @@ export class InventarioService {
         );
       }
 
-      return this.buildMovimientoResponse(existente.id);
+      return { status: 'duplicate' as const, id: existente.id };
     }
 
     const variante = await this.prisma.varianteSku.findUnique({
@@ -114,10 +154,21 @@ export class InventarioService {
       }
     }
 
-    const decrementaOrigen = TIPOS_QUE_DECREMENTAN.includes(dto.tipo);
+    if (dto.movimientoReferenciaId) {
+      const referencia = await this.prisma.movimientoInventario.findUnique({
+        where: { id: dto.movimientoReferenciaId },
+      });
+      if (!referencia) {
+        throw new NotFoundException(
+          `Movimiento de referencia ${dto.movimientoReferenciaId} no encontrado`,
+        );
+      }
+    }
+
+    const decrementa = decrementaOrigen(dto);
 
     const movimientoId = await this.prisma.$transaction(async (tx) => {
-      if (decrementaOrigen) {
+      if (decrementa) {
         const saldoOrigen = await tx.saldoInventario.findUnique({
           where: {
             varianteId_ubicacionId: {
@@ -150,10 +201,11 @@ export class InventarioService {
           motivo: dto.motivo,
           usuarioId,
           idempotencyKey,
+          movimientoReferenciaId: dto.movimientoReferenciaId ?? null,
         },
       });
 
-      const deltaOrigen = decrementaOrigen ? -dto.cantidad : dto.cantidad;
+      const deltaOrigen = decrementa ? -dto.cantidad : dto.cantidad;
       await tx.saldoInventario.upsert({
         where: {
           varianteId_ubicacionId: {
@@ -189,7 +241,195 @@ export class InventarioService {
       return movimiento.id;
     }, TRANSACTION_OPTIONS);
 
-    return this.buildMovimientoResponse(movimientoId);
+    return { status: 'processed' as const, id: movimientoId };
+  }
+
+  /**
+   * Procesa un lote de operaciones offline (RF-007 / ADR-004). Cada operación se procesa y
+   * reporta de forma individual — nunca todo-o-nada (FA-02): una operación inválida no aborta
+   * las demás. La idempotencia por operación garantiza que reenviar el mismo lote produce el
+   * mismo estado final (criterio de aceptación RF-007). El permiso por tipo se verifica aquí
+   * por operación, porque el guard sincrónico solo cubre un `tipo` por request.
+   */
+  async procesarBatch(
+    operaciones: BatchOperacion[],
+    usuario: { id: string; rol: string },
+  ) {
+    const resultados: BatchResultado[] = [];
+
+    for (const op of operaciones) {
+      const tipo = op.payload?.tipo;
+      try {
+        if (!puedeRegistrarMovimiento(usuario.rol, tipo)) {
+          resultados.push({
+            idempotencyKey: op.idempotencyKey,
+            status: 'error',
+            detalle: `El rol '${usuario.rol}' no puede registrar movimientos de tipo '${tipo ?? '(vacío)'}'`,
+          });
+          continue;
+        }
+
+        const { status } = await this.registrarMovimiento(
+          op.payload,
+          usuario.id,
+          op.idempotencyKey,
+        );
+        resultados.push({ idempotencyKey: op.idempotencyKey, status });
+      } catch (err) {
+        // El batch reporta el error de la operación y sigue; no propaga la excepción.
+        const detalle =
+          err instanceof HttpException
+            ? (() => {
+                const r = err.getResponse();
+                if (typeof r === 'string') return r;
+                const obj = r as Record<string, unknown>;
+                return (
+                  (obj.error as string) ||
+                  (obj.message as string) ||
+                  err.message
+                );
+              })()
+            : 'error_interno';
+        resultados.push({
+          idempotencyKey: op.idempotencyKey,
+          status: 'error',
+          detalle,
+        });
+      }
+    }
+
+    return { resultados };
+  }
+
+  /**
+   * Cambio de talla (RF-008): dos movimientos ligados y atómicos en una sola transacción —
+   * DEVOLUCION de la prenda devuelta (vuelve a stock) y SALIDA de la nueva (sale de stock),
+   * ligados por `movimientoReferenciaId`. Si la SALIDA falla por stock insuficiente, la
+   * DEVOLUCION tampoco se persiste: nunca queda medio cambio aplicado.
+   */
+  async cambioTalla(
+    dto: CambioTallaDto,
+    usuarioId: string,
+    idempotencyKey: string,
+  ) {
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException(
+        'El header idempotency-key es obligatorio para un cambio de talla',
+      );
+    }
+    if (dto.varianteDevueltaId === dto.varianteNuevaId) {
+      throw new BadRequestException(
+        'La variante devuelta y la nueva no pueden ser la misma',
+      );
+    }
+
+    const keyDevolucion = `${idempotencyKey}:devolucion`;
+    const keySalida = `${idempotencyKey}:salida`;
+
+    // Idempotencia del par: si ya se procesó este cambio, se devuelve sin re-aplicar.
+    const yaProcesado = await this.prisma.movimientoInventario.findUnique({
+      where: { idempotencyKey: keyDevolucion },
+    });
+    if (yaProcesado) {
+      return this.buildCambioTallaResponse(keyDevolucion, keySalida);
+    }
+
+    for (const varId of [dto.varianteDevueltaId, dto.varianteNuevaId]) {
+      const v = await this.prisma.varianteSku.findUnique({
+        where: { id: varId },
+      });
+      if (!v) throw new NotFoundException(`Variante ${varId} no encontrada`);
+    }
+    const ubicacion = await this.prisma.ubicacion.findUnique({
+      where: { id: dto.ubicacionId },
+    });
+    if (!ubicacion)
+      throw new NotFoundException(`Ubicación ${dto.ubicacionId} no encontrada`);
+
+    await this.prisma.$transaction(async (tx) => {
+      const saldoNueva = await tx.saldoInventario.findUnique({
+        where: {
+          varianteId_ubicacionId: {
+            varianteId: dto.varianteNuevaId,
+            ubicacionId: dto.ubicacionId,
+          },
+        },
+      });
+      const disponible = saldoNueva?.cantidad ?? 0;
+      if (disponible < dto.cantidad) {
+        throw new UnprocessableEntityException({
+          error: 'insufficient_stock',
+          message: `Stock insuficiente de la talla nueva: disponible ${disponible}, solicitado ${dto.cantidad}`,
+          disponible,
+          solicitado: dto.cantidad,
+        });
+      }
+
+      const devolucion = await tx.movimientoInventario.create({
+        data: {
+          varianteId: dto.varianteDevueltaId,
+          ubicacionId: dto.ubicacionId,
+          tipo: MovimientoTipo.DEVOLUCION,
+          cantidad: dto.cantidad,
+          motivo: dto.motivo,
+          usuarioId,
+          idempotencyKey: keyDevolucion,
+        },
+      });
+      await tx.saldoInventario.upsert({
+        where: {
+          varianteId_ubicacionId: {
+            varianteId: dto.varianteDevueltaId,
+            ubicacionId: dto.ubicacionId,
+          },
+        },
+        update: { cantidad: { increment: dto.cantidad } },
+        create: {
+          varianteId: dto.varianteDevueltaId,
+          ubicacionId: dto.ubicacionId,
+          cantidad: dto.cantidad,
+        },
+      });
+
+      await tx.movimientoInventario.create({
+        data: {
+          varianteId: dto.varianteNuevaId,
+          ubicacionId: dto.ubicacionId,
+          tipo: MovimientoTipo.SALIDA,
+          cantidad: dto.cantidad,
+          motivo: dto.motivo,
+          usuarioId,
+          idempotencyKey: keySalida,
+          movimientoReferenciaId: devolucion.id,
+        },
+      });
+      await tx.saldoInventario.update({
+        where: {
+          varianteId_ubicacionId: {
+            varianteId: dto.varianteNuevaId,
+            ubicacionId: dto.ubicacionId,
+          },
+        },
+        data: { cantidad: { decrement: dto.cantidad } },
+      });
+    }, TRANSACTION_OPTIONS);
+
+    return this.buildCambioTallaResponse(keyDevolucion, keySalida);
+  }
+
+  private async buildCambioTallaResponse(
+    keyDevolucion: string,
+    keySalida: string,
+  ) {
+    const [devolucion, salida] = await Promise.all([
+      this.prisma.movimientoInventario.findUnique({
+        where: { idempotencyKey: keyDevolucion },
+      }),
+      this.prisma.movimientoInventario.findUnique({
+        where: { idempotencyKey: keySalida },
+      }),
+    ]);
+    return { cambioTalla: { devolucion, salida } };
   }
 
   private async buildMovimientoResponse(movimientoId: string) {

@@ -11,6 +11,7 @@ import { InventarioModule } from './inventario/inventario.module';
 import { CatalogoModule } from './catalogo/catalogo.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { StorageModule } from './storage/storage.module';
+import { HealthModule } from './health/health.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -35,6 +36,7 @@ import { AppService } from './app.service';
     InventarioModule,
     CatalogoModule,
     StorageModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

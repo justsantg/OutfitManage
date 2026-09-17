@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Empaquetado standalone solo en el build de Docker (BUILD_STANDALONE=1). En Windows el
+  // trazado de archivos standalone usa symlinks que el SO bloquea (EPERM); el build local no lo
+  // necesita, y el build Linux de Docker sí lo activa. (Fase 6 / ADR-005.)
+  output: process.env.BUILD_STANDALONE === '1' ? 'standalone' : undefined,
   images: {
     remotePatterns: [
       // El storage real de este backend es Supabase (ver .env.example), no Cloudinary —
@@ -53,7 +57,9 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "img-src 'self' data: https://*.supabase.co",
+              // images.unsplash.com: fotos editoriales del landing y del catálogo (<img> y
+              // texturas WebGL de HeroTunnel); sin esta entrada la CSP las bloquea.
+              "img-src 'self' data: https://*.supabase.co https://images.unsplash.com",
               "media-src 'self' https://*.supabase.co",
               "connect-src 'self'",
               "script-src 'self' 'unsafe-inline'",

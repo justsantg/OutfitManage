@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -H 0.0.0.0 -p 3001",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "next start -H 0.0.0.0 -p 3001",
     "lint": "next lint"
   },
@@ -14,7 +15,7 @@
     "gsap": "^3.15.0",
     "lucide-react": "^0.475.0",
     "motion": "^13.1.1",
-    "next": "^15.1.7",
+    "next": "^15.5.25",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.0.1",

@@ -10,17 +10,87 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-function getAuthHeader(): HeadersInit {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('tienda360_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+const ACCESS_KEY = 'tienda360_token';
+const REFRESH_KEY = 'tienda360_refresh';
+
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ACCESS_KEY);
+}
+
+function clearSession() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem('tienda360_user');
+  localStorage.removeItem(REFRESH_KEY);
+}
+
+// Renueva el access token con el refresh token almacenado (rotación server-side). Devuelve el
+// nuevo access token o null si la renovación falla. Se serializa en una sola promesa para que
+// varias peticiones que reciben 401 a la vez no disparen múltiples rotaciones en paralelo.
+let refreshInFlight: Promise<string | null> | null = null;
+async function refreshTokens(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return null;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        localStorage.setItem(ACCESS_KEY, data.accessToken);
+        if (data.refreshToken) localStorage.setItem(REFRESH_KEY, data.refreshToken);
+        if (data.user) localStorage.setItem('tienda360_user', JSON.stringify(data.user));
+        return data.accessToken as string;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
+// fetch con Authorization y renovación transparente: ante un 401, intenta rotar el token una vez
+// y reintenta la petición original con el token nuevo.
+async function authedFetch(
+  input: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const token = getToken();
+  const withAuth: RequestInit = {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  };
+
+  let res = await fetch(input, withAuth);
+  if (res.status !== 401) return res;
+
+  const nuevoToken = await refreshTokens();
+  if (!nuevoToken) return res;
+
+  res = await fetch(input, {
+    ...init,
+    headers: { ...(init.headers || {}), Authorization: `Bearer ${nuevoToken}` },
+  });
+  return res;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 401) {
+    // La renovación ya se intentó en authedFetch; si seguimos en 401, la sesión terminó.
+    clearSession();
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('tienda360_token');
-      localStorage.removeItem('tienda360_user');
       window.location.href = '/login';
     }
     throw new Error('Sesión expirada o no autorizada');
@@ -42,16 +112,16 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export const api = {
   // Dashboard
   getDashboardStats: async (): Promise<DashboardStats> => {
-    const res = await fetch(`${API_BASE_URL}/api/inventario/dashboard/stats`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_BASE_URL}/api/inventario/dashboard/stats`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<DashboardStats>(res);
   },
 
   // Productos
   getProductos: async (page = 1, limit = 20): Promise<{ items: Producto[]; meta: any }> => {
-    const res = await fetch(`${API_BASE_URL}/api/productos?page=${page}&limit=${limit}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_BASE_URL}/api/productos?page=${page}&limit=${limit}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse(res);
   },
@@ -70,10 +140,9 @@ export const api = {
       precio: number;
     }[];
   }): Promise<Producto> => {
-    const res = await fetch(`${API_BASE_URL}/api/productos`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/productos`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -100,10 +169,9 @@ export const api = {
       }[];
     }
   ): Promise<Producto> => {
-    const res = await fetch(`${API_BASE_URL}/api/productos/${id}`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/productos/${id}`, {
       method: 'PATCH',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -112,10 +180,9 @@ export const api = {
   },
 
   deleteProducto: async (id: string): Promise<any> => {
-    const res = await fetch(`${API_BASE_URL}/api/productos/${id}`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/productos/${id}`, {
       method: 'DELETE',
       headers: {
-        ...getAuthHeader(),
       },
     });
     return handleResponse(res);
@@ -123,8 +190,8 @@ export const api = {
 
   // Ubicaciones
   getUbicaciones: async (): Promise<Ubicacion[]> => {
-    const res = await fetch(`${API_BASE_URL}/api/ubicaciones`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_BASE_URL}/api/ubicaciones`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<Ubicacion[]>(res);
   },
@@ -134,10 +201,9 @@ export const api = {
     tipo: 'BODEGA' | 'TIENDA';
     direccion?: string;
   }): Promise<Ubicacion> => {
-    const res = await fetch(`${API_BASE_URL}/api/ubicaciones`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/ubicaciones`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -147,8 +213,8 @@ export const api = {
 
   // Categorías
   getCategorias: async (): Promise<Categoria[]> => {
-    const res = await fetch(`${API_BASE_URL}/api/categorias`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_BASE_URL}/api/categorias`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<Categoria[]>(res);
   },
@@ -158,10 +224,9 @@ export const api = {
     descripcion?: string;
     categoriaPadreId?: string;
   }): Promise<Categoria> => {
-    const res = await fetch(`${API_BASE_URL}/api/categorias`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/categorias`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -179,10 +244,9 @@ export const api = {
     motivo?: string;
   }): Promise<{ movimiento: MovimientoInventario; deduplicated: boolean }> => {
     const idempotencyKey = uuidv4();
-    const res = await fetch(`${API_BASE_URL}/api/inventario/movimientos`, {
+    const res = await authedFetch(`${API_BASE_URL}/api/inventario/movimientos`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
         'idempotency-key': idempotencyKey,
       },
@@ -192,8 +256,8 @@ export const api = {
   },
 
   getMovimientos: async (page = 1, limit = 20): Promise<{ items: MovimientoInventario[]; meta: any }> => {
-    const res = await fetch(`${API_BASE_URL}/api/inventario/movimientos?page=${page}&limit=${limit}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_BASE_URL}/api/inventario/movimientos?page=${page}&limit=${limit}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse(res);
   },
@@ -204,8 +268,8 @@ export const api = {
     if (query.sku) params.append('sku', query.sku);
     if (query.ubicacionId) params.append('ubicacionId', query.ubicacionId);
 
-    const res = await fetch(`${API_BASE_URL}/api/inventario/stock?${params.toString()}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_BASE_URL}/api/inventario/stock?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<any>(res);
   },

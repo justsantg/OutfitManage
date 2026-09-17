@@ -10,6 +10,7 @@ export interface UsuarioAuth {
 export interface AuthResponse {
   user: UsuarioAuth;
   accessToken: string;
+  refreshToken?: string;
   tokenType: string;
   expiresIn: string;
 }

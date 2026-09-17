@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing acotado a la lógica de negocio crítica (SRS §5 Mantenibilidad y §9). El coverage de línea se puede satisfacer con tests que no asertan nada; el mutation score no. Objetivo ≥60% en inventario, auth y storage.",
+  "packageManager": "pnpm",
+  "testRunner": "jest",
+  "jest": { "configFile": "package.json" },
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/inventario/**/*.ts",
+    "src/auth/**/*.ts",
+    "src/storage/storage.service.ts",
+    "src/common/guards/**/*.ts",
+    "!src/**/*.spec.ts"
+  ],
+  "thresholds": { "high": 80, "low": 60, "break": 50 },
+  "reporters": ["progress", "clear-text", "html"]
+}

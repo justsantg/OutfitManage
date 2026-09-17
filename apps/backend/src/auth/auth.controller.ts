@@ -19,6 +19,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request';
 
@@ -64,6 +65,44 @@ export class AuthController {
   })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  // Límite más alto que el de login: una sesión activa renueva de forma legítima cada 15 min,
+  // pero sigue acotado para que un refresh token robado no sirva para generar access tokens en masa.
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh')
+  @ApiOperation({
+    summary: 'Renovar el access token',
+    description:
+      'Rota el refresh token: el presentado queda revocado y se emite uno nuevo. Reusar un token ' +
+      'ya rotado revoca toda la familia de tokens de esa sesión (SRS Sección 5).',
+  })
+  @ApiResponse({ status: 200, description: 'Tokens renovados' })
+  @ApiResponse({
+    status: 401,
+    description: 'Refresh token inválido, expirado, revocado o reusado',
+  })
+  async refresh(@Body() dto: RefreshTokenDto, @Ip() ip: string) {
+    return this.authService.refresh(dto.refreshToken, ip);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cerrar sesión',
+    description:
+      'Revoca la familia completa de refresh tokens de la sesión. El access token vigente expira por sí solo.',
+  })
+  @ApiResponse({ status: 200, description: 'Sesión cerrada' })
+  async logout(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: AuthenticatedRequest,
+    @Ip() ip: string,
+  ) {
+    return this.authService.logout(dto.refreshToken, req.user.id, ip);
   }
 
   @UseGuards(JwtAuthGuard)

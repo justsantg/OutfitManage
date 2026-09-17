@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Empaquetado standalone solo en el build de Docker (BUILD_STANDALONE=1). En Windows el
+  // trazado de archivos standalone usa symlinks que el SO bloquea (EPERM); el build local no lo
+  // necesita, y el build Linux de Docker sí lo activa. (Fase 6 / ADR-005.)
+  output: process.env.BUILD_STANDALONE === '1' ? 'standalone' : undefined,
   async headers() {
     // Cabeceras de seguridad obligatorias en producción (SRS Sección 5).
     return [

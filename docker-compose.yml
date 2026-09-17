@@ -1,0 +1,75 @@
+# Despliegue dedicado por instalación (ADR-005). Levanta la instalación completa desde cero:
+#   docker compose up -d --build
+# Requiere un archivo .env junto a este compose (ver .env.docker.example).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tienda360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-tienda360}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-tienda360}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No se publica el puerto de Postgres al host: solo lo alcanzan los servicios de esta red.
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tienda360}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-tienda360}?schema=public
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
+      JWT_REFRESH_EXPIRATION_DIAS: ${JWT_REFRESH_EXPIRATION_DIAS:-30}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      SUPABASE_BUCKET_IMAGES: ${SUPABASE_BUCKET_IMAGES:-products_images}
+      SUPABASE_BUCKET_VIDEOS: ${SUPABASE_BUCKET_VIDEOS:-products_videos}
+      TIENDA_WHATSAPP_PHONE: ${TIENDA_WHATSAPP_PHONE}
+      TIENDA_NOMBRE: ${TIENDA_NOMBRE:-Tienda360}
+    ports:
+      - '${BACKEND_PORT:-3000}:3000'
+
+  web-catalogo:
+    build:
+      context: .
+      dockerfile: apps/web-catalogo/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      # Usado por los rewrites server-side de Next hacia el backend en la red interna.
+      INTERNAL_BACKEND_URL: http://backend:3000
+    ports:
+      - '${CATALOGO_PORT:-3001}:3000'
+
+  web-admin:
+    build:
+      context: .
+      dockerfile: apps/web-admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_CATALOGO_URL: ${PUBLIC_CATALOGO_URL}
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - '${ADMIN_PORT:-3002}:3000'
+
+volumes:
+  pgdata:

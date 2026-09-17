@@ -14,6 +14,85 @@ const ALLOWED_MIME_TO_EXT: Record<string, string> = {
   'video/quicktime': 'mov',
 };
 
+// Marcas ISO-BMFF (caja `ftyp`) aceptadas. Se enumeran explícitamente para no dejar pasar
+// otros contenedores con la misma estructura (p. ej. audio M4A o HEIC).
+const MP4_BRANDS = new Set([
+  'isom',
+  'iso2',
+  'iso3',
+  'iso4',
+  'iso5',
+  'iso6',
+  'mp41',
+  'mp42',
+  'avc1',
+  'mmp4',
+  'M4V ',
+  'MSNV',
+  'dash',
+]);
+const QUICKTIME_BRANDS = new Set(['qt  ']);
+
+/**
+ * Detecta el tipo MIME real de un archivo a partir de su firma binaria (magic numbers).
+ * Devuelve `null` si el contenido no corresponde a ninguno de los formatos permitidos: el
+ * `mimetype` declarado por el cliente HTTP es trivial de falsificar y nunca se usa para decidir.
+ */
+export function detectMimeTypeFromBuffer(buffer: Buffer): string | null {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
+
+  const ascii = (start: number, end: number) =>
+    buffer.toString('latin1', start, end);
+
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return 'image/jpeg';
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer
+      .subarray(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return 'image/png';
+  }
+
+  // GIF: "GIF87a" | "GIF89a"
+  const gifHeader = ascii(0, 6);
+  if (gifHeader === 'GIF87a' || gifHeader === 'GIF89a') {
+    return 'image/gif';
+  }
+
+  // WEBP: "RIFF" <tamaño 4 bytes> "WEBP"
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') {
+    return 'image/webp';
+  }
+
+  // MP4 / QuickTime: <tamaño 4 bytes> "ftyp" <marca mayor 4 bytes>
+  if (ascii(4, 8) === 'ftyp') {
+    const brand = ascii(8, 12);
+    if (QUICKTIME_BRANDS.has(brand)) return 'video/quicktime';
+    if (MP4_BRANDS.has(brand)) return 'video/mp4';
+    return null;
+  }
+
+  // WebM: cabecera EBML 1A 45 DF A3 con DocType "webm" (Matroska .mkv comparte la cabecera
+  // pero declara DocType "matroska", que no se acepta).
+  if (
+    buffer[0] === 0x1a &&
+    buffer[1] === 0x45 &&
+    buffer[2] === 0xdf &&
+    buffer[3] === 0xa3
+  ) {
+    return ascii(0, Math.min(buffer.length, 64)).includes('webm')
+      ? 'video/webm'
+      : null;
+  }
+
+  return null;
+}
+
 export interface UploadedMulterFile {
   fieldname?: string;
   originalname: string;
@@ -82,21 +161,29 @@ export class StorageService {
 
   /**
    * Sube un archivo al bucket correspondiente (imágenes o videos). El tipo de contenido, el
-   * bucket destino y la extensión se derivan del MIME real del archivo (validado contra una
-   * allowlist), nunca del nombre de archivo ni del mimetype declarados por el cliente.
+   * bucket destino y la extensión se derivan del MIME detectado en los bytes del archivo
+   * (magic numbers, validado contra una allowlist), nunca del nombre de archivo ni del
+   * mimetype declarados por el cliente.
    */
   async uploadFile(
     file: UploadedMulterFile,
     customFolder?: string,
   ): Promise<UploadResult> {
-    const ext = ALLOWED_MIME_TO_EXT[file.mimetype];
-    if (!ext) {
+    const realMime = detectMimeTypeFromBuffer(file.buffer);
+    const ext = realMime ? ALLOWED_MIME_TO_EXT[realMime] : undefined;
+    if (!realMime || !ext) {
       throw new BadRequestException(
-        `Tipo de archivo no permitido: ${file.mimetype}. Formatos aceptados: ${Object.keys(ALLOWED_MIME_TO_EXT).join(', ')}`,
+        `El contenido del archivo no corresponde a un formato permitido. Formatos aceptados: ${Object.keys(ALLOWED_MIME_TO_EXT).join(', ')}`,
       );
     }
 
-    const isVideo = file.mimetype.startsWith('video/');
+    if (realMime !== file.mimetype) {
+      this.logger.warn(
+        `MIME declarado por el cliente (${file.mimetype}) no coincide con el contenido real (${realMime}); se usa el real`,
+      );
+    }
+
+    const isVideo = realMime.startsWith('video/');
     const bucket = isVideo ? this.videosBucket : this.imagesBucket;
     const tipo = isVideo ? 'VIDEO' : 'IMAGE';
 
@@ -109,7 +196,7 @@ export class StorageService {
     const { data, error } = await this.supabase.storage
       .from(bucket)
       .upload(filePath, file.buffer, {
-        contentType: file.mimetype,
+        contentType: realMime,
         upsert: false,
       });
 
