@@ -1,4 +1,5 @@
 import { MessageCircle, ShieldCheck, Clock, MapPin } from 'lucide-react';
+import { getWhatsAppUrl } from '../lib/constants';
 
 export default function Footer() {
   const storeName = process.env.NEXT_PUBLIC_TIENDA_NOMBRE || 'OutfitManage';
@@ -42,7 +43,7 @@ export default function Footer() {
               ¿Tienes dudas con tu talla o color? Escríbenos directamente y un asesor te atenderá al instante.
             </p>
             <a
-              href="https://wa.me/573001234567"
+              href={getWhatsAppUrl('¡Hola! Me gustaría comunicarme con un asesor de la tienda.')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20 transition-all duration-200"

@@ -11,11 +11,79 @@ import {
 import { getPrivateApiUrl } from './api';
 
 const API_ROOT = getPrivateApiUrl('');
+const ACCESS_KEY = 'tienda360_token';
+const REFRESH_KEY = 'tienda360_refresh';
 
-function getAuthHeader(): HeadersInit {
-  if (typeof window === 'undefined') return {};
-  const token = localStorage.getItem('tienda360_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ACCESS_KEY);
+}
+
+function clearSession() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem('tienda360_user');
+  localStorage.removeItem(REFRESH_KEY);
+}
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshTokens(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return null;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(getPrivateApiUrl('/auth/refresh'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        localStorage.setItem(ACCESS_KEY, data.accessToken);
+        if (data.refreshToken) localStorage.setItem(REFRESH_KEY, data.refreshToken);
+        if (data.user) localStorage.setItem('tienda360_user', JSON.stringify(data.user));
+        return data.accessToken as string;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
+export async function authedFetch(
+  input: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const token = getToken();
+  const withAuth: RequestInit = {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  };
+
+  let res = await fetch(input, withAuth);
+  if (res.status !== 401) return res;
+
+  const nuevoToken = await refreshTokens();
+  if (!nuevoToken) return res;
+
+  res = await fetch(input, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      Authorization: `Bearer ${nuevoToken}`,
+    },
+  });
+  return res;
 }
 
 function generateIdempotencyKey(): string {
@@ -26,6 +94,14 @@ function generateIdempotencyKey(): string {
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
+  if (res.status === 401) {
+    clearSession();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Sesión expirada o no autorizada');
+  }
+
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     let message = 'Ocurrió un error inesperado';
@@ -67,23 +143,17 @@ export const adminApi = {
     formData.append('file', file);
     if (folder) formData.append('folder', folder);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('tienda360_token') : null;
-
-    const res = await fetch(`${API_ROOT}/storage/upload`, {
+    const res = await authedFetch(`${API_ROOT}/storage/upload`, {
       method: 'POST',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
       body: formData,
     });
     return handleResponse(res);
   },
 
   deleteMediaFile: async (bucket: string, path: string): Promise<{ success: boolean }> => {
-    const res = await fetch(`${API_ROOT}/storage/file`, {
+    const res = await authedFetch(`${API_ROOT}/storage/file`, {
       method: 'DELETE',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ bucket, path }),
@@ -93,16 +163,16 @@ export const adminApi = {
 
   // Dashboard
   getDashboardStats: async (): Promise<DashboardStats> => {
-    const res = await fetch(`${API_ROOT}/inventario/dashboard/stats`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_ROOT}/inventario/dashboard/stats`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<DashboardStats>(res);
   },
 
   // Productos
   getProductos: async (page = 1, limit = 50): Promise<{ items: Producto[]; meta: any }> => {
-    const res = await fetch(`${API_ROOT}/productos?page=${page}&limit=${limit}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_ROOT}/productos?page=${page}&limit=${limit}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse(res);
   },
@@ -118,19 +188,30 @@ export const adminApi = {
       talla: string;
       color: string;
       atributoOpcional?: string;
-      imagenUrl?: string;
-      imagenes?: string[];
-      barcode?: string;
       precio: number;
+      ubicacionId?: string;
+      cantidadInicial?: number;
+      imagenes?: ({ url: string; tipo: 'IMAGE' | 'VIDEO'; orden?: number } | string)[];
     }[];
   }): Promise<Producto> => {
-    const res = await fetch(`${API_ROOT}/productos`, {
+    const normalizedData = {
+      ...data,
+      variantes: data.variantes.map((v) => ({
+        ...v,
+        imagenes: v.imagenes?.map((img, idx) =>
+          typeof img === 'string'
+            ? { url: img, tipo: 'IMAGE' as const, orden: idx }
+            : img
+        ),
+      })),
+    };
+
+    const res = await authedFetch(`${API_ROOT}/productos`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(normalizedData),
     });
     return handleResponse<Producto>(res);
   },
@@ -149,55 +230,65 @@ export const adminApi = {
         talla: string;
         color: string;
         atributoOpcional?: string;
-        imagenUrl?: string;
-        imagenes?: string[];
-        barcode?: string;
         precio?: number;
-        activo?: boolean;
+        imagenes?: ({ url: string; tipo: 'IMAGE' | 'VIDEO'; orden?: number } | string)[];
       }[];
     }
   ): Promise<Producto> => {
-    const res = await fetch(`${API_ROOT}/productos/${id}`, {
+    const normalizedData = {
+      ...data,
+      variantes: data.variantes?.map((v) => ({
+        ...v,
+        imagenes: v.imagenes?.map((img, idx) =>
+          typeof img === 'string'
+            ? { url: img, tipo: 'IMAGE' as const, orden: idx }
+            : img
+        ),
+      })),
+    };
+
+    const res = await authedFetch(`${API_ROOT}/productos/${id}`, {
       method: 'PATCH',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(normalizedData),
     });
     return handleResponse<Producto>(res);
   },
 
-  deleteProducto: async (id: string): Promise<any> => {
-    const res = await fetch(`${API_ROOT}/productos/${id}`, {
+  deleteProducto: async (id: string): Promise<{ message: string }> => {
+    const res = await authedFetch(`${API_ROOT}/productos/${id}`, {
       method: 'DELETE',
-      headers: {
-        ...getAuthHeader(),
-      },
     });
     return handleResponse(res);
   },
 
   // Ubicaciones
   getUbicaciones: async (): Promise<Ubicacion[]> => {
-    const res = await fetch(`${API_ROOT}/ubicaciones`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_ROOT}/ubicaciones`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<Ubicacion[]>(res);
   },
 
   createUbicacion: async (data: {
+    codigo?: string;
     nombre: string;
     tipo: 'BODEGA' | 'TIENDA';
     direccion?: string;
+    activa?: boolean;
   }): Promise<Ubicacion> => {
-    const res = await fetch(`${API_ROOT}/ubicaciones`, {
+    const payload = {
+      ...data,
+      codigo: data.codigo || `UBI-${Date.now().toString(36).toUpperCase()}`,
+    };
+    const res = await authedFetch(`${API_ROOT}/ubicaciones`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     return handleResponse<Ubicacion>(res);
   },
@@ -205,15 +296,16 @@ export const adminApi = {
   updateUbicacion: async (
     id: string,
     data: {
+      codigo?: string;
       nombre?: string;
       tipo?: 'BODEGA' | 'TIENDA';
       direccion?: string;
+      activa?: boolean;
     }
   ): Promise<Ubicacion> => {
-    const res = await fetch(`${API_ROOT}/ubicaciones/${id}`, {
+    const res = await authedFetch(`${API_ROOT}/ubicaciones/${id}`, {
       method: 'PATCH',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -221,36 +313,38 @@ export const adminApi = {
     return handleResponse<Ubicacion>(res);
   },
 
-  deleteUbicacion: async (id: string): Promise<any> => {
-    const res = await fetch(`${API_ROOT}/ubicaciones/${id}`, {
+  deleteUbicacion: async (id: string): Promise<{ message: string }> => {
+    const res = await authedFetch(`${API_ROOT}/ubicaciones/${id}`, {
       method: 'DELETE',
-      headers: {
-        ...getAuthHeader(),
-      },
     });
     return handleResponse(res);
   },
 
   // Categorías
   getCategorias: async (): Promise<Categoria[]> => {
-    const res = await fetch(`${API_ROOT}/categorias`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_ROOT}/categorias`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<Categoria[]>(res);
   },
 
   createCategoria: async (data: {
+    codigo?: string;
     nombre: string;
     descripcion?: string;
     categoriaPadreId?: string;
+    activa?: boolean;
   }): Promise<Categoria> => {
-    const res = await fetch(`${API_ROOT}/categorias`, {
+    const payload = {
+      ...data,
+      codigo: data.codigo || `CAT-${Date.now().toString(36).toUpperCase()}`,
+    };
+    const res = await authedFetch(`${API_ROOT}/categorias`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     return handleResponse<Categoria>(res);
   },
@@ -258,15 +352,15 @@ export const adminApi = {
   updateCategoria: async (
     id: string,
     data: {
+      codigo?: string;
       nombre?: string;
       descripcion?: string;
-      categoriaPadreId?: string;
+      activa?: boolean;
     }
   ): Promise<Categoria> => {
-    const res = await fetch(`${API_ROOT}/categorias/${id}`, {
+    const res = await authedFetch(`${API_ROOT}/categorias/${id}`, {
       method: 'PATCH',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -274,81 +368,138 @@ export const adminApi = {
     return handleResponse<Categoria>(res);
   },
 
-  deleteCategoria: async (id: string): Promise<any> => {
-    const res = await fetch(`${API_ROOT}/categorias/${id}`, {
+  deleteCategoria: async (id: string): Promise<{ message: string }> => {
+    const res = await authedFetch(`${API_ROOT}/categorias/${id}`, {
       method: 'DELETE',
-      headers: {
-        ...getAuthHeader(),
-      },
     });
     return handleResponse(res);
   },
 
-  // Movimientos Ledger
-  getMovimientos: async (page = 1, limit = 30, tipo?: string): Promise<{ items: MovimientoInventario[]; meta: any }> => {
-    const q = tipo && tipo !== 'TODOS' ? `&tipo=${encodeURIComponent(tipo)}` : '';
-    const res = await fetch(`${API_ROOT}/inventario/movimientos?page=${page}&limit=${limit}${q}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+  // Inventario & Movimientos
+  getMovimientos: async (
+    page = 1,
+    limit = 50,
+    searchParams?: string | { productoId?: string; ubicacionId?: string; tipo?: string }
+  ): Promise<{ items: MovimientoInventario[]; meta: any }> => {
+    let q = '';
+    if (typeof searchParams === 'string') {
+      q = `&tipo=${encodeURIComponent(searchParams)}`;
+    } else if (searchParams && typeof searchParams === 'object') {
+      q = `&${new URLSearchParams(searchParams as any).toString()}`;
+    }
+
+    const res = await authedFetch(`${API_ROOT}/inventario/movimientos?page=${page}&limit=${limit}${q}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse(res);
   },
 
-  // Consulta Rápida de Stock (Vendedores y Bodega)
-  buscarStockRapido: async (q?: string, categoriaId?: string): Promise<{ items: any[]; ubicaciones: Ubicacion[] }> => {
+  buscarInventario: async (searchParams: {
+    q?: string;
+    ubicacionId?: string;
+    categoriaId?: string;
+    talla?: string;
+    color?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ items: any[]; meta: any }> => {
+    const params = new URLSearchParams();
+    if (searchParams.q) params.append('q', searchParams.q);
+    if (searchParams.ubicacionId) params.append('ubicacionId', searchParams.ubicacionId);
+    if (searchParams.categoriaId) params.append('categoriaId', searchParams.categoriaId);
+    if (searchParams.talla) params.append('talla', searchParams.talla);
+    if (searchParams.color) params.append('color', searchParams.color);
+    if (searchParams.page) params.append('page', searchParams.page.toString());
+    if (searchParams.limit) params.append('limit', searchParams.limit.toString());
+
+    const res = await authedFetch(`${API_ROOT}/inventario/buscar?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    return handleResponse(res);
+  },
+
+  buscarStockRapido: async (
+    q?: string,
+    categoriaId?: string,
+    ubicacionId?: string
+  ): Promise<{ items: any[]; meta: any }> => {
     const params = new URLSearchParams();
     if (q) params.append('q', q);
     if (categoriaId) params.append('categoriaId', categoriaId);
+    if (ubicacionId) params.append('ubicacionId', ubicacionId);
+    params.append('limit', '100');
 
-    const res = await fetch(`${API_ROOT}/inventario/buscar?${params.toString()}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    const res = await authedFetch(`${API_ROOT}/inventario/buscar?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse(res);
   },
 
-  createMovimiento: async (
-    data: {
-      varianteId: string;
-      ubicacionId: string;
-      ubicacionDestinoId?: string;
-      tipo: TipoMovimiento;
-      cantidad: number;
-      motivo?: string;
-    },
-    customIdempotencyKey?: string
-  ): Promise<{
-    message: string;
-    movimiento: MovimientoInventario;
-    deduplicated?: boolean;
-  }> => {
-    const idempotencyKey = customIdempotencyKey || generateIdempotencyKey();
+  registrarMovimiento: async (data: {
+    varianteId: string;
+    ubicacionId?: string;
+    ubicacionOrigenId?: string;
+    ubicacionDestinoId?: string;
+    tipo: TipoMovimiento;
+    cantidad: number;
+    motivo?: string;
+    idempotencyKey?: string;
+  }): Promise<MovimientoInventario> => {
+    const payload = {
+      ...data,
+      ubicacionId: data.ubicacionId || data.ubicacionOrigenId,
+      ubicacionOrigenId: data.ubicacionOrigenId || data.ubicacionId,
+      idempotencyKey: data.idempotencyKey || generateIdempotencyKey(),
+    };
 
-    const res = await fetch(`${API_ROOT}/inventario/movimientos`, {
+    const res = await authedFetch(`${API_ROOT}/inventario/movimientos`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
-        'Idempotency-Key': idempotencyKey,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
-    return handleResponse(res);
+    return handleResponse<MovimientoInventario>(res);
+  },
+
+  // Alias para retrocompatibilidad
+  createMovimiento: async (data: {
+    varianteId: string;
+    ubicacionId?: string;
+    ubicacionOrigenId?: string;
+    ubicacionDestinoId?: string;
+    tipo: TipoMovimiento;
+    cantidad: number;
+    motivo?: string;
+    idempotencyKey?: string;
+  }): Promise<MovimientoInventario> => {
+    return adminApi.registrarMovimiento(data);
   },
 
   // Usuarios
-  getUsuarios: async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    rol?: string;
-  }): Promise<UsuariosResponse> => {
+  getUsuarios: async (
+    pageOrQuery?: number | { search?: string; rol?: string; page?: number; limit?: number },
+    limitParam = 20,
+    searchParam?: string,
+    rolParam?: string
+  ): Promise<UsuariosResponse> => {
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', params.page.toString());
-    if (params?.limit) query.append('limit', params.limit.toString());
-    if (params?.search) query.append('search', params.search);
-    if (params?.rol && params.rol !== 'TODOS') query.append('rol', params.rol);
 
-    const res = await fetch(`${API_ROOT}/usuarios?${query.toString()}`, {
-      headers: { ...getAuthHeader(), Accept: 'application/json' },
+    if (typeof pageOrQuery === 'object' && pageOrQuery !== null) {
+      if (pageOrQuery.page) query.append('page', pageOrQuery.page.toString());
+      if (pageOrQuery.limit) query.append('limit', pageOrQuery.limit.toString());
+      if (pageOrQuery.search) query.append('search', pageOrQuery.search);
+      if (pageOrQuery.rol) query.append('rol', pageOrQuery.rol);
+    } else {
+      const page = typeof pageOrQuery === 'number' ? pageOrQuery : 1;
+      query.append('page', page.toString());
+      query.append('limit', limitParam.toString());
+      if (searchParam) query.append('search', searchParam);
+      if (rolParam) query.append('rol', rolParam);
+    }
+
+    const res = await authedFetch(`${API_ROOT}/usuarios?${query.toString()}`, {
+      headers: { Accept: 'application/json' },
     });
     return handleResponse<UsuariosResponse>(res);
   },
@@ -360,10 +511,9 @@ export const adminApi = {
     rol?: string;
     activo?: boolean;
   }): Promise<UsuarioAdmin> => {
-    const res = await fetch(`${API_ROOT}/usuarios`, {
+    const res = await authedFetch(`${API_ROOT}/usuarios`, {
       method: 'POST',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -381,10 +531,9 @@ export const adminApi = {
       activo?: boolean;
     }
   ): Promise<UsuarioAdmin> => {
-    const res = await fetch(`${API_ROOT}/usuarios/${id}`, {
+    const res = await authedFetch(`${API_ROOT}/usuarios/${id}`, {
       method: 'PATCH',
       headers: {
-        ...getAuthHeader(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data),
@@ -393,22 +542,18 @@ export const adminApi = {
   },
 
   toggleUsuarioActivo: async (id: string): Promise<UsuarioAdmin> => {
-    const res = await fetch(`${API_ROOT}/usuarios/${id}/toggle-activo`, {
+    const res = await authedFetch(`${API_ROOT}/usuarios/${id}/toggle-activo`, {
       method: 'PATCH',
-      headers: {
-        ...getAuthHeader(),
-      },
     });
     return handleResponse<UsuarioAdmin>(res);
   },
 
   deleteUsuario: async (id: string): Promise<{ message: string }> => {
-    const res = await fetch(`${API_ROOT}/usuarios/${id}`, {
+    const res = await authedFetch(`${API_ROOT}/usuarios/${id}`, {
       method: 'DELETE',
-      headers: {
-        ...getAuthHeader(),
-      },
     });
     return handleResponse(res);
   },
 };
+
+export default adminApi;

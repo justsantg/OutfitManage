@@ -57,19 +57,7 @@ services:
       # Usado por los rewrites server-side de Next hacia el backend en la red interna.
       INTERNAL_BACKEND_URL: http://backend:3000
     ports:
-      - '${CATALOGO_PORT:-3001}:3000'
-
-  web-admin:
-    build:
-      context: .
-      dockerfile: apps/web-admin/Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
-        NEXT_PUBLIC_CATALOGO_URL: ${PUBLIC_CATALOGO_URL}
-    restart: unless-stopped
-    depends_on: [backend]
-    ports:
-      - '${ADMIN_PORT:-3002}:3000'
+      - '${FRONTEND_PORT:-4200}:3000'
 
 volumes:
   pgdata:

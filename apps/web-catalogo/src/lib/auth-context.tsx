@@ -57,6 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     localStorage.setItem('tienda360_token', data.accessToken);
     localStorage.setItem('tienda360_user', JSON.stringify(data.user));
+    if (data.refreshToken) {
+      localStorage.setItem('tienda360_refresh', data.refreshToken);
+    }
 
     // Redirección inteligente por rol
     if (data.user.rol === 'ADMIN') {
@@ -90,6 +93,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     localStorage.setItem('tienda360_token', authData.accessToken);
     localStorage.setItem('tienda360_user', JSON.stringify(authData.user));
+    if (authData.refreshToken) {
+      localStorage.setItem('tienda360_refresh', authData.refreshToken);
+    }
 
     // Redirección inteligente por rol
     if (authData.user.rol === 'ADMIN') {
@@ -106,10 +112,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // Revoca la familia de refresh tokens en el servidor (SRS §5)
+    const refreshToken = localStorage.getItem('tienda360_refresh');
+    const currentToken = token || localStorage.getItem('tienda360_token');
+
+    if (refreshToken && currentToken) {
+      void fetch(getPrivateApiUrl('/auth/logout'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => {
+        // Best-effort: si falla la red, la sesión local se cierra igual
+      });
+    }
+
     setToken(null);
     setUser(null);
     localStorage.removeItem('tienda360_token');
     localStorage.removeItem('tienda360_user');
+    localStorage.removeItem('tienda360_refresh');
+
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     } else {

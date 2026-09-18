@@ -125,7 +125,7 @@ export default function AdminVentasTerminalPage() {
 
       if (resUbis.length > 0) {
         // Default to first tienda, or first location
-        const firstTienda = resUbis.find((u) => u.tipo === "TIENDA") || resUbis[0];
+        const firstTienda = resUbis.find((u: Ubicacion) => u.tipo === "TIENDA") || resUbis[0];
         setSelectedUbicacionId(firstTienda.id);
         setSaleUbicacionId(firstTienda.id);
         setExchangeUbicacionId(firstTienda.id);

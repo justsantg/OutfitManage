@@ -4,14 +4,23 @@
 
 @layer base {
   :root {
-    --background: #050505;
-    --foreground: #f8fafc;
-    --card: #0d121f;
-    --card-foreground: #f8fafc;
-    --border: #1e293b;
-    --muted: #0f172a;
-    --muted-foreground: #94a3b8;
-    --accent: #38bdf8;
+    /* ── Afera XV — Nocturne Minimal ── */
+    --background: #C7D6E1;
+    --background-mid: #BAC9D6;
+    --background-warm: #DCE0E3;
+    --foreground: #171B20;
+    --foreground-soft: #2B3138;
+    --card: #F4F2EE;
+    --card-foreground: #171B20;
+    --border: #C9CDD2;
+    --muted: #E9EDEF;
+    --muted-foreground: #8B95A0;
+    --accent: #3A3F45;
+    --moon-core: #FBFAF6;
+    --moon-halo: #E9EDEF;
+    --cloud: #F4F2EE;
+    --ink-dark: #171B20;
+    --ink-soft: #2B3138;
   }
 
   .light {
@@ -27,7 +36,7 @@
 
   html {
     overflow-x: clip;
-    background-color: #050505;
+    background-color: #C7D6E1;
   }
 
   body {
@@ -39,12 +48,63 @@
   }
 }
 
-/* Glassmorphism & Cards */
+/* ── Grain / Noise Overlay (Afera XV — stippling texture) ── */
+.grain-overlay {
+  position: relative;
+  isolation: isolate;
+}
+
+.grain-overlay::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* ── Ink-stroke organic divider ── */
+.ink-stroke-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border) 15%,
+    var(--muted-foreground) 50%,
+    var(--border) 85%,
+    transparent 100%
+  );
+  opacity: 0.4;
+}
+
+/* ── Petal Fall Animation (Afera XV — cherry blossom) ── */
+@keyframes petalFall {
+  0% {
+    transform: translate3d(0, -20px, 0) rotate(0deg) scale(0.8);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--petal-opacity, 0.7);
+  }
+  85% {
+    opacity: var(--petal-opacity, 0.7);
+  }
+  100% {
+    transform: translate3d(var(--drift-x, 60px), 105vh, 0) rotate(var(--rot, 270deg)) scale(1.05);
+    opacity: 0;
+  }
+}
+
+/* ── Glassmorphism & Cards (Nocturne Minimal) ── */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(244, 242, 238, 0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(201, 205, 210, 0.4);
 }
 
 .dark .glass-panel {
@@ -53,8 +113,8 @@
 }
 
 .glass-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: rgba(251, 250, 246, 0.7);
+  border: 1px solid rgba(201, 205, 210, 0.35);
 }
 
 .dark .glass-card {
@@ -62,6 +122,7 @@
   border: 1px solid #1e293b;
 }
 
+/* ── WhatsApp glow ── */
 .glow-whatsapp {
   box-shadow: 0 0 20px -3px rgba(37, 211, 102, 0.35);
 }
@@ -70,7 +131,7 @@
   box-shadow: 0 0 25px 0px rgba(37, 211, 102, 0.55);
 }
 
-/* Custom modern scrollbar */
+/* ── Custom modern scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -81,7 +142,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #B0BAC4;
   border-radius: 9999px;
 }
 
@@ -90,7 +151,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #8B95A0;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {

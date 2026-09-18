@@ -57,12 +57,10 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // images.unsplash.com: fotos editoriales del landing y del catálogo (<img> y
-              // texturas WebGL de HeroTunnel); sin esta entrada la CSP las bloquea.
-              "img-src 'self' data: https://*.supabase.co https://images.unsplash.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://res.cloudinary.com https://via.placeholder.com",
               "media-src 'self' https://*.supabase.co",
-              "connect-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              "connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:* https://*.supabase.co",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",
               "frame-ancestors 'none'",
