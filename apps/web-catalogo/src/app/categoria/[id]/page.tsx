@@ -30,7 +30,7 @@ export default async function CategoriaPage({ params }: CategoriaPageProps) {
   const { id } = await params;
   const [categorias, catalogoData] = await Promise.all([
     fetchCategorias(),
-    fetchCatalogo({ categoria: id, limit: 50 }),
+    fetchCatalogo({ categoria: id, limit: 48 }),
   ]);
 
   const categoria = categorias.find((c) => c.id === id);

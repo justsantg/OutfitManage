@@ -88,7 +88,7 @@ export function HeroTunnel({
         const mat = new THREE.MeshBasicMaterial({
           map: tex,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.75,
           side: THREE.DoubleSide,
         });
 
@@ -192,8 +192,8 @@ export function HeroTunnel({
     const rowHeight = TUNNEL_HEIGHT / wallRows;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDarkMode ? 0x050505 : 0xffffff);
-    scene.fog = new THREE.FogExp2(isDarkMode ? 0x050505 : 0xffffff, 0.038);
+    scene.background = new THREE.Color(isDarkMode ? 0x050505 : 0xC7D6E1);
+    scene.fog = new THREE.FogExp2(isDarkMode ? 0x050505 : 0xC7D6E1, 0.038);
     sceneRef.current = scene;
 
     const width = containerRef.current.clientWidth || window.innerWidth;
@@ -222,9 +222,9 @@ export function HeroTunnel({
       const d = SEGMENT_DEPTH;
 
       const lineMaterial = new THREE.LineBasicMaterial({
-        color: isDarkMode ? 0x555555 : 0xb0b0b0,
+        color: isDarkMode ? 0x555555 : 0x8B95A0,
         transparent: true,
-        opacity: isDarkMode ? 0.35 : 0.5,
+        opacity: isDarkMode ? 0.35 : 0.3,
       });
 
       const lineGeo = new THREE.BufferGeometry();
@@ -365,9 +365,9 @@ export function HeroTunnel({
   // Update colors on dark mode change
   useEffect(() => {
     if (!sceneRef.current) return;
-    const bgHex = isDarkMode ? 0x050505 : 0xffffff;
-    const lineHex = isDarkMode ? 0x555555 : 0xb0b0b0;
-    const lineOp = isDarkMode ? 0.35 : 0.5;
+    const bgHex = isDarkMode ? 0x050505 : 0xC7D6E1;
+    const lineHex = isDarkMode ? 0x555555 : 0x8B95A0;
+    const lineOp = isDarkMode ? 0.35 : 0.3;
 
     sceneRef.current.background = new THREE.Color(bgHex);
     if (sceneRef.current.fog) {
@@ -395,7 +395,7 @@ export function HeroTunnel({
         minHeight: "100vh",
         position: "relative",
         overflow: "hidden",
-        backgroundColor: isDarkMode ? "#050505" : "#ffffff",
+        backgroundColor: isDarkMode ? "#050505" : "#C7D6E1",
       }}
     >
       <div

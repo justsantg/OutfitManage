@@ -25,6 +25,8 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RbacGuard } from '../common/guards/rbac.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
+// Nota (RF-009 FA-02): Nest mapea el error LIMIT_FILE_SIZE de Multer a 413 PayloadTooLargeException
+// de forma nativa, así que un archivo que excede el límite ya responde 413 sin filtro adicional.
 @ApiTags('Storage & Media')
 @Controller('api/storage')
 export class StorageController {

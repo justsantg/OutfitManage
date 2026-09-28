@@ -278,13 +278,13 @@ export class CatalogoService {
           imagenUrl: varImgsFirmadas[0]?.url || null,
           precio: v.precios[0]?.precio ? Number(v.precios[0].precio) : null,
           disponible: stockTotal > 0,
+          // Solo estado cualitativo: la API pública nunca expone cantidades exactas (SEC-13).
           stockStatus:
             stockTotal === 0
               ? 'OUT_OF_STOCK'
               : stockTotal <= 3
                 ? 'LOW_STOCK'
                 : 'IN_STOCK',
-          stockRestante: stockTotal <= 3 && stockTotal > 0 ? stockTotal : null,
         };
       }),
     );

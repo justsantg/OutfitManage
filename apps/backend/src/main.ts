@@ -1,9 +1,10 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
+import { SecurityLoggingFilter } from './common/filters/security-logging.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -23,6 +24,11 @@ async function bootstrap() {
     );
     next();
   });
+
+  // Filtro global que registra 401/403/429/5xx (política de logging del SRS §5) sin cambiar el
+  // formato de las respuestas de error.
+  const httpAdapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new SecurityLoggingFilter(httpAdapterHost.httpAdapter));
 
   // Habilitar ValidationPipe global para DTOs con conversión implícita de query params
   app.useGlobalPipes(

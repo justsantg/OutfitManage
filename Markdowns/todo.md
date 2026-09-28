@@ -203,3 +203,108 @@ verificación estática ni en tests unitarios con mocks):**
 
 
 
+
+---
+
+## Revisión preliminar externa — contraste con el código (2026-09-15)
+
+Un informe externo describía como **ya aplicadas** varias correcciones que no estaban en el
+repositorio (árbol limpio en `d20c04c`): ni la detección por magic numbers, ni `page.tsx` raíz,
+ni el manifiesto PWA, ni los cambios de `turbo.json`/`package.json`. Además, `stockRestante`
+seguía expuesto en `GET /public/productos/:id` pese a que la sección anterior marcaba SEC-13 como
+cerrado (solo se había quitado del listado). Se implementó y verificó todo en esta ronda:
+
+- [x] **SEC-07 (completado):** `detectMimeTypeFromBuffer` en `storage.service.ts` valida la firma
+      binaria real (JPEG, PNG, GIF, WEBP, MP4 por marcas `ftyp` permitidas, QuickTime, WebM por
+      DocType EBML). El `mimetype` del cliente ya no decide nada: contentType, bucket y extensión
+      salen del contenido. Rechaza ejecutables/scripts renombrados, M4A y Matroska.
+- [x] **SEC-13 (completado):** eliminado `stockRestante` de `getProductoDetalle`.
+- [x] `.env.example` backend: ADR-008 (Supabase Storage) como decisión oficial; migración de la
+      BD a Supabase marcada como PENDIENTE de verificación, PostgreSQL local por defecto.
+- [x] Swagger de `LoginDto` ya no sugiere `admin123` como contraseña de ejemplo.
+- [x] `web-catalogo`: página raíz `/` (antes 404) con las secciones editoriales existentes;
+      `public/manifest.webmanifest` (referenciado por `layout.tsx` y `sw.js`, antes 404).
+- [x] **CSP de `web-catalogo`:** `img-src` no permitía `images.unsplash.com`, origen de todas las
+      fotos del landing (`<img>` y texturas WebGL de `HeroTunnel`) — se habrían visto en blanco.
+- [x] `web-admin` login: eliminado "Acceso Rápido de Prueba" con credenciales embebidas; el enlace
+      al catálogo usa `NEXT_PUBLIC_CATALOGO_URL`.
+- [x] Monorepo: `"ui": "stream"` en `turbo.json` (y `!.next/cache/**` fuera de outputs);
+      `pnpm dev` = build de `@core/api-client` + `pnpm -r --parallel dev` (turbo sigue en
+      `pnpm dev:turbo`); script `dev` en `@core/api-client`. Nota: ninguna app importa hoy
+      `@core/api-client`, así que no era causa de fallos de arranque del backend.
+- [x] Verificado: 7 suites / 70 tests backend; `tsc --noEmit` limpio en los 4 paquetes; build de
+      producción de backend, web-catalogo (14 rutas) y web-admin (10 rutas); `next start` sirve
+      `/` 200, manifiesto 200 `application/manifest+json`, íconos 200 y la CSP nueva.
+
+**No verificado en esta ronda:**
+- [ ] Crash `3221226505` de turbo en Windows: no reproducido aquí; el cambio es preventivo.
+- [ ] `pnpm dev` completo en paralelo (requiere `.env` y base de datos del backend).
+- [ ] Visualización real en navegador del landing (animaciones WebGL/scroll).
+
+**Pendiente de decisión:**
+- [ ] `web-catalogo` (app pública) contiene un panel administrativo completo (`/admin/*`, `/login`,
+      `/register`) duplicado respecto a `web-admin`, contrario a la separación de ADR-001.
+
+---
+
+## Faltantes respecto al SRS — desarrollo (2026-09-15)
+
+Auditoría del código contra el SRS v1.2 (todos los RF, RNF, ADRs y el DoD). Lo implementado y
+verificado en esta ronda:
+
+**Backend — contratos y RF que faltaban:**
+- [x] **Refresh token con rotación** (SRS §5): modelo `RefreshToken` (solo hash SHA-256, familias,
+      detección de reuso con revocación de familia), `RefreshTokenService`, endpoints
+      `POST /api/auth/refresh` y `POST /api/auth/logout`. Login y registro ahora devuelven
+      `refreshToken`. Migración `20260915000000_refresh_token_rotacion` generada offline. 6 tests.
+- [x] **`POST /api/sync/batch`** (RF-007 / ADR-004): procesa operaciones offline por-operación
+      (nunca todo-o-nada, FA-02), idempotente (reenviar el mismo lote no duplica), con permiso por
+      tipo validado por operación. Cota de 100 operaciones (§5). 4 tests.
+- [x] **RF-003 corrección referenciada + AJUSTE bidireccional**: `movimientoReferenciaId` en el DTO
+      y persistido (el ledger es inmutable, se corrige con un movimiento nuevo que referencia al
+      original); AJUSTE ahora puede incrementar (sobrante en conteo) o decrementar (faltante).
+- [x] **RF-008 cambio de talla**: `POST /api/inventario/cambio-talla` crea DEVOLUCION + SALIDA
+      ligadas y atómicas en una transacción (nunca medio cambio aplicado). 4 tests.
+- [x] **Health checks independientes** (ADR-001): `GET /health` (liveness) y `GET /health/ready`
+      (readiness con `SELECT 1`).
+- [x] **413 en subida** (RF-009 FA-02): `MulterExceptionFilter` mapea `LIMIT_FILE_SIZE` a 413.
+- [x] **Logging de seguridad** (§5): filtro global que registra 401/403/429/5xx en JSON
+      estructurado (sin password/token/payload) sin alterar el formato de respuesta.
+- [x] **Test de contrato público bloqueante** (R-004 / DoD): recorre la respuesta de `/public/*` y
+      falla si aparece costo/margen/proveedor/stock exacto. 3 tests.
+
+**Frontend:**
+- [x] `web-admin`: `authedFetch` centraliza las llamadas y renueva el token de forma transparente
+      ante un 401 (rotación serializada). Login/registro guardan el refresh token; logout lo revoca
+      en el servidor.
+
+**Tooling / infra (Fase 6 y DoD):**
+- [x] **Pipeline CI** (`.github/workflows/ci.yml`): gates de build+typecheck+lint+tests,
+      cobertura, `pnpm audit`, OSV, gitleaks y Semgrep. Corre solo en CI (no ve el `.env` local).
+- [x] **Umbrales de cobertura**: lógica de inventario a 88% (objetivo DoD ≥70%); auth, refresh,
+      guards y storage con gate propio; piso global anti-regresión.
+- [x] **Empaquetado Docker** (ADR-005): Dockerfiles multi-stage (backend + los dos Next en
+      standalone), `docker-compose.yml` (Postgres + 3 servicios), `.env.docker.example`,
+      `.dockerignore`. `next build` local en Windows queda limpio (standalone solo en Docker/Linux).
+- [x] **Parche de seguridad de dependencias**: de 23 advisories (2 críticas RCE de Next) a
+      `pnpm audit` limpio, vía bump de Next y `overrides` en `pnpm-workspace.yaml`.
+
+**Estado de verificación:** 93 tests backend en verde (9 suites); `tsc --noEmit` limpio en los 4
+paquetes; build de producción OK en backend, web-catalogo (16 rutas) y web-admin; `pnpm audit` sin
+vulnerabilidades.
+
+**Faltantes que NO se abordaron (fuera del alcance de esta ronda o requieren decisión):**
+- [ ] **App móvil React Native/Expo** (RF-007 completo, Fase 4): no existe. El backend ya expone
+      `/api/sync/batch` que consumiría. Es un desarrollo aparte, no un ajuste.
+- [ ] **UI de gestión de usuarios en web-admin** (RF-006): el backend (`/api/usuarios`) existe y
+      está protegido, pero no hay pantalla. Falta también la UI de devolución/cambio de talla.
+- [ ] **Cobertura del "resto del backend" a ≥50%** (DoD): controladores y servicios CRUD
+      (categorias, ubicaciones, productos, usuarios parcial) sin tests unitarios. El piso global
+      actual (~18%) es anti-regresión, no el objetivo.
+- [ ] **Verificación en runtime de CI y Docker**: no se ejecutaron aquí (sin Docker en el entorno;
+      el trace standalone de Next requiere Linux). Config validada estáticamente.
+- [ ] **`web-catalogo` con panel admin duplicado** (`/admin/*`, `/login`, `/register`): contradice
+      ADR-001; su auth no se conectó al refresh token. Pendiente de decisión (eliminar vs mantener).
+- [ ] **`@core/api-client`**: ninguna app lo importa aún; tipos no generados desde OpenAPI (ADR-007).
+- [ ] **Verificación dinámica de seguridad** (sqlmap `--level 3`, pruebas de carga p95): requieren
+      staging con el protocolo del gate de herramientas.

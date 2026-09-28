@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ProductoDetallePublico, VariantePublica } from '../types/catalogo';
 import { formatCurrency } from '../lib/api';
+import { getWhatsAppUrl } from '../lib/constants';
 import {
   MessageCircle,
   ArrowLeft,
@@ -45,7 +46,7 @@ export default function ProductDetailView({ producto }: ProductDetailViewProps) 
       : ''
   }. ¿Tienen disponibilidad para envío inmediato?`;
 
-  const dynamicWhatsAppLink = `https://wa.me/573001234567?text=${encodeURIComponent(customMessage)}`;
+  const dynamicWhatsAppLink = getWhatsAppUrl(customMessage);
 
   // Compartir ficha
   const handleShare = () => {

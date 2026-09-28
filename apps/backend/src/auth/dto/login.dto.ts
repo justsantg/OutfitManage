@@ -12,7 +12,7 @@ export class LoginDto {
 
   @ApiProperty({
     description: 'Contraseña de acceso',
-    example: 'admin123',
+    example: 'contraseña-segura',
   })
   @IsString()
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })

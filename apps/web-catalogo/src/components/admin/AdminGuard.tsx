@@ -27,11 +27,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const pathname = usePathname();
 
-  const isAuthRoute =
-    pathname === '/login' ||
-    pathname === '/register' ||
-    pathname === '/admin/login' ||
-    pathname === '/admin/register';
+  const isAuthRoute = pathname === '/login' || pathname === '/register';
 
   useEffect(() => {
     if (!isLoading) {

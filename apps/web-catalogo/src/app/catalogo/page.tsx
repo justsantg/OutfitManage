@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useTransition, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { fetchCatalogo, fetchCategorias } from "../../lib/api";
 import { CategoriaPublica, ProductoPublicoItem } from "../../types/catalogo";
 import { BreathingNavbar } from "../../components/ui/breathing-navbar";
 import { BentoGridCreator, BentoItem, SpanConfigItem } from "../../components/ui/bento-grid-creator";
 import { FilterSidebar, FilterState } from "../../components/catalogo/filter-sidebar";
 import { LiquidGlassFooter } from "../../components/ui/liquid-glass-footer";
-import { Sparkles, Search, Loader2, RefreshCw, ShoppingBag, SlidersHorizontal, X } from "lucide-react";
+import { CherryBlossomBackground } from "../../components/ui/cherry-blossom-background";
+import { Sparkles, Search, Loader2, RefreshCw, ShoppingBag, SlidersHorizontal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -36,38 +37,54 @@ export default function CatalogoPage() {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   // Load categories on mount
   useEffect(() => {
+    let isCancelled = false;
     fetchCategorias()
-      .then((cats) => setCategorias(cats))
-      .catch(() => {});
+      .then((cats) => {
+        if (!isCancelled && Array.isArray(cats)) {
+          setCategorias(cats);
+        }
+      })
+      .catch((err) => {
+        console.error("Error cargando categorías:", err);
+      });
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   // Fetch products from backend
   useEffect(() => {
     let isCancelled = false;
     setLoading(true);
+    setError(null);
 
-    const timer = setTimeout(() => {
-      startTransition(async () => {
-        try {
-          const data = await fetchCatalogo({
-            categoria: filters.categoryId || undefined,
-            q: search || undefined,
-            limit: 100,
-          });
+    const timer = setTimeout(async () => {
+      try {
+        const data = await fetchCatalogo({
+          categoria: filters.categoryId || undefined,
+          q: search || undefined,
+          limit: 48,
+        });
 
-          if (!isCancelled) {
-            setProductos(data.items);
-            setLoading(false);
-          }
-        } catch {
-          if (!isCancelled) setLoading(false);
+        if (!isCancelled) {
+          setProductos(data?.items || []);
         }
-      });
+      } catch (err: any) {
+        if (!isCancelled) {
+          console.error("Error fetching catálogo:", err);
+          setError(err?.message || "No se pudo consultar el catálogo.");
+          setProductos([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
     }, 150);
 
     return () => {
@@ -188,32 +205,35 @@ export default function CatalogoPage() {
     (filters.maxPrice !== null ? 1 : 0);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white selection:bg-indigo-500 selection:text-white flex flex-col justify-between">
+    <div className="grain-overlay relative min-h-screen bg-gradient-to-b from-[#C7D6E1] via-[#BAC9D6] to-[#DCE0E3] text-[#171B20] selection:bg-[#8B95A0]/30 selection:text-[#2B3138] flex flex-col justify-between overflow-x-hidden">
+      {/* Sumi-e Cherry Blossom Tree & Drifting Petals Atmospheric Background */}
+      <CherryBlossomBackground opacity={0.22} petalCount={28} />
+
       {/* Floating Navbar */}
       <BreathingNavbar />
 
       <main className="pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-10">
         {/* Header Title Section */}
         <div className="text-center space-y-3 max-w-3xl mx-auto pt-6">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-white shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-widest text-zinc-300">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#171B20]/5 border border-[#C9CDD2]/40 text-[#171B20] shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-[#3A3F45]" />
+            <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-widest text-[#8B95A0]">
               Catálogo Oficial &amp; Filtros Avanzados
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-[#171B20]">
             Colección &amp; Prendas Exclusivas
           </h1>
 
-          <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
+          <p className="text-sm sm:text-base text-[#8B95A0] leading-relaxed">
             Filtra por precio, talla, color y categoría para encontrar la prenda ideal con disponibilidad en vivo.
           </p>
         </div>
 
         {/* 2-Column Layout: Sidebar Filter on the Left, Bento Gallery on the Right */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Desktop Filter Sidebar (3 cols) */}
+          {/* Desktop Filter Sidebar (4 cols) */}
           <div className="hidden lg:block lg:col-span-4 sticky top-24">
             <FilterSidebar
               categorias={categorias}
@@ -224,24 +244,24 @@ export default function CatalogoPage() {
             />
           </div>
 
-          {/* Right Main Content (8-9 cols) */}
+          {/* Right Main Content (8 cols) */}
           <div className="lg:col-span-8 space-y-6">
             {/* Search Bar + Mobile Filter Toggle Button */}
-            <div className="p-4 rounded-3xl bg-zinc-950/70 border border-white/10 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row items-center gap-3">
+            <div className="p-4 rounded-3xl bg-[#F4F2EE]/75 border border-[#C9CDD2]/40 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row items-center gap-3">
               {/* Search input */}
               <div className="relative flex-1 w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8B95A0]" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar por nombre de prenda o silueta..."
-                  className="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-white/[0.05] border border-white/10 text-white text-xs sm:text-sm placeholder-zinc-500 focus:outline-none focus:border-indigo-400 transition-all"
+                  className="w-full pl-11 pr-4 py-2.5 rounded-2xl bg-[#FBFAF6]/70 border border-[#C9CDD2]/40 text-[#171B20] text-xs sm:text-sm placeholder-[#8B95A0] focus:outline-none focus:border-[#3A3F45] transition-all"
                 />
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-[#8B95A0] hover:text-[#171B20]"
                   >
                     Limpiar
                   </button>
@@ -252,12 +272,12 @@ export default function CatalogoPage() {
               <button
                 type="button"
                 onClick={() => setMobileDrawerOpen(true)}
-                className="lg:hidden w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 text-white text-xs font-mono font-bold flex items-center justify-center gap-2"
+                className="lg:hidden w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-[#171B20]/[0.06] hover:bg-[#171B20]/[0.12] border border-[#C9CDD2]/40 text-[#171B20] text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all"
               >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#3A3F45]" />
                 <span>Filtros</span>
                 {totalActiveFilterCount > 0 && (
-                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full bg-[#171B20] text-[#FBFAF6] text-[10px] flex items-center justify-center">
                     {totalActiveFilterCount}
                   </span>
                 )}
@@ -265,10 +285,10 @@ export default function CatalogoPage() {
             </div>
 
             {/* Results Counter & Active Pills */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-2 text-xs font-mono text-zinc-400">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-2 text-xs font-mono text-[#8B95A0]">
               <div className="flex items-center gap-2">
                 <span>
-                  Mostrando <strong className="text-white">{filteredProducts.length}</strong> de{" "}
+                  Mostrando <strong className="text-[#171B20] font-bold">{filteredProducts.length}</strong> de{" "}
                   {productos.length} prendas
                 </span>
               </div>
@@ -276,7 +296,7 @@ export default function CatalogoPage() {
               {totalActiveFilterCount > 0 && (
                 <button
                   onClick={handleResetFilters}
-                  className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 hover:underline"
+                  className="flex items-center gap-1 text-[#3A3F45] hover:text-[#171B20] font-bold hover:underline transition-colors"
                 >
                   <RefreshCw className="w-3 h-3" />
                   <span>Limpiar {totalActiveFilterCount} filtros</span>
@@ -287,25 +307,48 @@ export default function CatalogoPage() {
             {/* Bento Gallery Products */}
             {loading ? (
               <div className="py-28 flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-                <span className="text-xs font-mono text-zinc-400 uppercase tracking-widest">
+                <Loader2 className="w-10 h-10 text-[#3A3F45] animate-spin" />
+                <span className="text-xs font-mono text-[#8B95A0] uppercase tracking-widest">
                   Consultando inventario en tiempo real...
                 </span>
               </div>
-            ) : bentoItems.length === 0 ? (
-              <div className="py-24 px-6 text-center rounded-3xl bg-zinc-950/40 border border-white/10 space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mx-auto flex items-center justify-center">
+            ) : error ? (
+              <div className="py-24 px-6 text-center rounded-3xl bg-[#F4F2EE]/70 border border-rose-500/30 space-y-4 shadow-sm">
+                <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 mx-auto flex items-center justify-center">
                   <ShoppingBag className="w-8 h-8" />
                 </div>
                 <div className="space-y-1 max-w-md mx-auto">
-                  <h3 className="text-lg font-bold text-white">No se encontraron prendas</h3>
-                  <p className="text-xs text-zinc-400">
+                  <h3 className="text-lg font-bold text-[#171B20]">Error al consultar el inventario</h3>
+                  <p className="text-xs text-[#8B95A0]">{error}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setLoading(true);
+                    setError(null);
+                    fetchCatalogo({ categoria: filters.categoryId || undefined, q: search || undefined, limit: 48 })
+                      .then((d) => setProductos(d?.items || []))
+                      .catch((e) => setError(e?.message))
+                      .finally(() => setLoading(false));
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-[#171B20] text-[#FBFAF6] font-bold text-xs hover:bg-[#2B3138] transition-all shadow-md"
+                >
+                  Reintentar Consulta
+                </button>
+              </div>
+            ) : bentoItems.length === 0 ? (
+              <div className="py-24 px-6 text-center rounded-3xl bg-[#F4F2EE]/70 border border-[#C9CDD2]/40 space-y-4 shadow-sm">
+                <div className="w-16 h-16 rounded-2xl bg-[#171B20]/5 border border-[#C9CDD2]/40 text-[#3A3F45] mx-auto flex items-center justify-center">
+                  <ShoppingBag className="w-8 h-8" />
+                </div>
+                <div className="space-y-1 max-w-md mx-auto">
+                  <h3 className="text-lg font-bold text-[#171B20]">No se encontraron prendas</h3>
+                  <p className="text-xs text-[#8B95A0]">
                     No hay productos que coincidan con la combinación de filtros seleccionada. Prueba ajustando el rango de precio, talla o color.
                   </p>
                 </div>
                 <button
                   onClick={handleResetFilters}
-                  className="px-5 py-2.5 rounded-xl bg-white text-black font-bold text-xs hover:bg-neutral-200 transition-all shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-[#171B20] text-[#FBFAF6] font-bold text-xs hover:bg-[#2B3138] transition-all shadow-md"
                 >
                   Restablecer Todos los Filtros
                 </button>
@@ -331,7 +374,7 @@ export default function CatalogoPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xl flex justify-end lg:hidden"
+            className="fixed inset-0 z-50 bg-[#171B20]/50 backdrop-blur-md flex justify-end lg:hidden"
             onClick={() => setMobileDrawerOpen(false)}
           >
             <motion.div
@@ -340,7 +383,7 @@ export default function CatalogoPage() {
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 350, damping: 30 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md h-full bg-zinc-950 border-l border-white/10 p-6 overflow-y-auto"
+              className="w-full max-w-md h-full bg-[#F4F2EE] border-l border-[#C9CDD2]/50 p-6 overflow-y-auto shadow-2xl"
             >
               <FilterSidebar
                 categorias={categorias}

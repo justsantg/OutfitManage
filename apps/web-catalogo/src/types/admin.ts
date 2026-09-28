@@ -40,6 +40,7 @@ export interface UsuariosResponse {
 export interface AuthResponse {
   user: UsuarioAuth;
   accessToken: string;
+  refreshToken?: string;
   tokenType: string;
   expiresIn: string;
 }
@@ -127,6 +128,7 @@ export interface MovimientoInventario {
   usuarioId: string;
   idempotencyKey: string;
   timestamp: string;
+  deduplicated?: boolean;
   variante?: {
     skuCode: string;
     talla: string;

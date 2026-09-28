@@ -1,0 +1,13 @@
+# Configuración de gitleaks para este monorepo. Extiende el ruleset por defecto y solo agrega
+# allowlist de rutas que contienen secretos-plantilla, nunca secretos reales.
+title = "OutfitManage gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Plantillas de entorno con valores de ejemplo, no secretos reales"
+paths = [
+  '''\.env\.example$''',
+  '''apps/backend/prisma/migrations/.*\.sql$''',
+]

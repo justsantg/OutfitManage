@@ -119,13 +119,13 @@ export function FilterSidebar({
 
   return (
     <aside
-      className={`w-full bg-zinc-950/80 border border-white/10 rounded-3xl p-6 backdrop-blur-xl shadow-2xl space-y-6 ${className}`}
+      className={`w-full bg-[#F4F2EE]/75 border border-[#C9CDD2]/40 rounded-3xl p-6 backdrop-blur-xl shadow-lg space-y-6 ${className}`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-white/10">
+      <div className="flex items-center justify-between pb-4 border-b border-[#C9CDD2]/30">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
-          <h2 className="text-xl font-black tracking-tight text-white">Filtrar por</h2>
+          <SlidersHorizontal className="w-4 h-4 text-[#3A3F45]" />
+          <h2 className="text-xl font-black tracking-tight text-[#171B20]">Filtrar por</h2>
         </div>
 
         <div className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export function FilterSidebar({
             <button
               type="button"
               onClick={onReset}
-              className="flex items-center gap-1 text-xs font-mono font-bold text-indigo-400 hover:text-indigo-300 hover:underline transition-colors"
+              className="flex items-center gap-1 text-xs font-mono font-bold text-[#3A3F45] hover:text-[#171B20] hover:underline transition-colors"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Limpiar</span>
@@ -144,7 +144,7 @@ export function FilterSidebar({
             <button
               type="button"
               onClick={onCloseMobileDrawer}
-              className="p-1 rounded-full text-zinc-400 hover:text-white"
+              className="p-1 rounded-full text-[#8B95A0] hover:text-[#171B20] transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -153,17 +153,17 @@ export function FilterSidebar({
       </div>
 
       {/* Accordion 1: Precio */}
-      <div className="space-y-3 pb-4 border-b border-white/10">
+      <div className="space-y-3 pb-4 border-b border-[#C9CDD2]/30">
         <button
           type="button"
           onClick={() => toggleSection("price")}
-          className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-indigo-300 transition-colors"
+          className="w-full flex items-center justify-between text-sm font-bold text-[#171B20] hover:text-[#3A3F45] transition-colors"
         >
           <span>Precio</span>
           {openSections.price ? (
-            <ChevronUp className="w-4 h-4 text-zinc-400" />
+            <ChevronUp className="w-4 h-4 text-[#8B95A0]" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-400" />
+            <ChevronDown className="w-4 h-4 text-[#8B95A0]" />
           )}
         </button>
 
@@ -177,9 +177,9 @@ export function FilterSidebar({
             >
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-mono uppercase text-zinc-400">Mínimo</span>
+                  <span className="text-[10px] font-mono uppercase text-[#8B95A0]">Mínimo</span>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-[#8B95A0]">
                       $
                     </span>
                     <input
@@ -187,15 +187,15 @@ export function FilterSidebar({
                       placeholder="0"
                       value={filters.minPrice !== null ? filters.minPrice.toLocaleString("es-CO") : ""}
                       onChange={handleMinPriceChange}
-                      className="w-full pl-7 pr-2 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-white text-xs font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-400"
+                      className="w-full pl-7 pr-2 py-2 rounded-xl bg-[#FBFAF6]/80 border border-[#C9CDD2]/50 text-[#171B20] text-xs font-mono placeholder-[#8B95A0] focus:outline-none focus:border-[#3A3F45] transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <span className="text-[10px] font-mono uppercase text-zinc-400">Máximo</span>
+                  <span className="text-[10px] font-mono uppercase text-[#8B95A0]">Máximo</span>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-zinc-400">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-[#8B95A0]">
                       $
                     </span>
                     <input
@@ -203,7 +203,7 @@ export function FilterSidebar({
                       placeholder={maxProductPrice.toLocaleString("es-CO")}
                       value={filters.maxPrice !== null ? filters.maxPrice.toLocaleString("es-CO") : ""}
                       onChange={handleMaxPriceChange}
-                      className="w-full pl-7 pr-2 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-white text-xs font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-400"
+                      className="w-full pl-7 pr-2 py-2 rounded-xl bg-[#FBFAF6]/80 border border-[#C9CDD2]/50 text-[#171B20] text-xs font-mono placeholder-[#8B95A0] focus:outline-none focus:border-[#3A3F45] transition-all"
                     />
                   </div>
                 </div>
@@ -214,24 +214,24 @@ export function FilterSidebar({
       </div>
 
       {/* Accordion 2: Talla */}
-      <div className="space-y-3 pb-4 border-b border-white/10">
+      <div className="space-y-3 pb-4 border-b border-[#C9CDD2]/30">
         <button
           type="button"
           onClick={() => toggleSection("size")}
-          className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-indigo-300 transition-colors"
+          className="w-full flex items-center justify-between text-sm font-bold text-[#171B20] hover:text-[#3A3F45] transition-colors"
         >
           <div className="flex items-center gap-2">
             <span>Talla</span>
             {filters.tallas.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-bold">
+              <span className="px-1.5 py-0.2 rounded-full bg-[#171B20]/10 text-[#171B20] text-[10px] font-mono font-bold">
                 {filters.tallas.length}
               </span>
             )}
           </div>
           {openSections.size ? (
-            <ChevronUp className="w-4 h-4 text-zinc-400" />
+            <ChevronUp className="w-4 h-4 text-[#8B95A0]" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-400" />
+            <ChevronDown className="w-4 h-4 text-[#8B95A0]" />
           )}
         </button>
 
@@ -248,14 +248,14 @@ export function FilterSidebar({
                 return (
                   <label
                     key={talla}
-                    className="flex items-center gap-3 cursor-pointer py-1 text-xs text-zinc-300 hover:text-white transition-colors group"
+                    className="flex items-center gap-3 cursor-pointer py-1 text-xs text-[#2B3138] hover:text-[#171B20] transition-colors group"
                   >
                     <div
                       onClick={() => handleTallaToggle(talla)}
                       className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
                         isSelected
-                          ? "bg-indigo-600 border-indigo-500 text-white"
-                          : "border-white/20 bg-white/[0.04] group-hover:border-white/40"
+                          ? "bg-[#171B20] border-[#171B20] text-[#FBFAF6]"
+                          : "border-[#C9CDD2]/60 bg-white/60 group-hover:border-[#8B95A0]"
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
@@ -270,24 +270,24 @@ export function FilterSidebar({
       </div>
 
       {/* Accordion 3: Color */}
-      <div className="space-y-3 pb-4 border-b border-white/10">
+      <div className="space-y-3 pb-4 border-b border-[#C9CDD2]/30">
         <button
           type="button"
           onClick={() => toggleSection("color")}
-          className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-indigo-300 transition-colors"
+          className="w-full flex items-center justify-between text-sm font-bold text-[#171B20] hover:text-[#3A3F45] transition-colors"
         >
           <div className="flex items-center gap-2">
             <span>Color</span>
             {filters.colores.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-bold">
+              <span className="px-1.5 py-0.2 rounded-full bg-[#171B20]/10 text-[#171B20] text-[10px] font-mono font-bold">
                 {filters.colores.length}
               </span>
             )}
           </div>
           {openSections.color ? (
-            <ChevronUp className="w-4 h-4 text-zinc-400" />
+            <ChevronUp className="w-4 h-4 text-[#8B95A0]" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-400" />
+            <ChevronDown className="w-4 h-4 text-[#8B95A0]" />
           )}
         </button>
 
@@ -304,15 +304,15 @@ export function FilterSidebar({
                 return (
                   <label
                     key={col.name}
-                    className="flex items-center justify-between cursor-pointer py-1 text-xs text-zinc-300 hover:text-white transition-colors group"
+                    className="flex items-center justify-between cursor-pointer py-1 text-xs text-[#2B3138] hover:text-[#171B20] transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       <div
                         onClick={() => handleColorToggle(col.name)}
                         className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
                           isSelected
-                            ? "bg-indigo-600 border-indigo-500 text-white"
-                            : "border-white/20 bg-white/[0.04] group-hover:border-white/40"
+                            ? "bg-[#171B20] border-[#171B20] text-[#FBFAF6]"
+                            : "border-[#C9CDD2]/60 bg-white/60 group-hover:border-[#8B95A0]"
                         }`}
                       >
                         {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
@@ -321,7 +321,7 @@ export function FilterSidebar({
                     </div>
 
                     <span
-                      className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm"
+                      className="w-3.5 h-3.5 rounded-full border border-[#C9CDD2]/70 shadow-sm"
                       style={{ backgroundColor: col.hex }}
                     />
                   </label>
@@ -338,13 +338,13 @@ export function FilterSidebar({
           <button
             type="button"
             onClick={() => toggleSection("category")}
-            className="w-full flex items-center justify-between text-sm font-bold text-white hover:text-indigo-300 transition-colors"
+            className="w-full flex items-center justify-between text-sm font-bold text-[#171B20] hover:text-[#3A3F45] transition-colors"
           >
             <span>Categoría</span>
             {openSections.category ? (
-              <ChevronUp className="w-4 h-4 text-zinc-400" />
+              <ChevronUp className="w-4 h-4 text-[#8B95A0]" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-zinc-400" />
+              <ChevronDown className="w-4 h-4 text-[#8B95A0]" />
             )}
           </button>
 
@@ -362,14 +362,14 @@ export function FilterSidebar({
                     <label
                       key={cat.id}
                       onClick={() => handleCategorySelect(cat.id)}
-                      className="flex items-center justify-between cursor-pointer py-1 text-xs text-zinc-300 hover:text-white transition-colors group"
+                      className="flex items-center justify-between cursor-pointer py-1 text-xs text-[#2B3138] hover:text-[#171B20] transition-colors group"
                     >
                       <div className="flex items-center gap-3">
                         <div
                           className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
                             isSelected
-                              ? "bg-indigo-600 border-indigo-500 text-white"
-                              : "border-white/20 bg-white/[0.04] group-hover:border-white/40"
+                              ? "bg-[#171B20] border-[#171B20] text-[#FBFAF6]"
+                              : "border-[#C9CDD2]/60 bg-white/60 group-hover:border-[#8B95A0]"
                           }`}
                         >
                           {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
@@ -378,7 +378,7 @@ export function FilterSidebar({
                       </div>
 
                       {cat._count?.productos !== undefined && (
-                        <span className="text-[10px] font-mono text-zinc-500">
+                        <span className="text-[10px] font-mono text-[#8B95A0]">
                           {cat._count.productos}
                         </span>
                       )}

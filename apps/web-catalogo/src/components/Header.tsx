@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '../lib/auth-context';
 import { useTheme } from '../lib/theme-context';
+import { getWhatsAppUrl } from '../lib/constants';
 import {
   Sparkles,
   MessageCircle,
@@ -93,7 +94,7 @@ export default function Header() {
 
             {/* WhatsApp Directo */}
             <a
-              href={`https://wa.me/573001234567?text=${encodeURIComponent('¡Hola! Me gustaría hacer una consulta sobre los productos de su catálogo.')}`}
+              href={getWhatsAppUrl('¡Hola! Me gustaría hacer una consulta sobre los productos de su catálogo.')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all duration-200"
